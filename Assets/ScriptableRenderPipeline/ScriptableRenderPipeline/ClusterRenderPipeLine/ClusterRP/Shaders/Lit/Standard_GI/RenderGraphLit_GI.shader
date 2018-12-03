@@ -175,6 +175,69 @@ Shader "Viva/RenderGraph/Lit_GI"
 			ENDHLSL
 		}
 
+		
+		Pass
+		{
+            Name "ClusterGI"
+            Tags {"LightMode" = "ClusterGI"}
+
+            Stencil
+            {
+                //WriteMask[_StencilWriteMask]
+                ReadMask 64
+                Ref 64//[_StencilRef]
+                Comp Equal
+                Pass Keep
+            }
+
+            ZTest LEqual
+            Blend [_SrcBlend] [_DstBlend]
+            ZWrite[_ZWrite]
+            Cull[_Cull]
+
+            HLSLPROGRAM
+
+            // -------------------------------------
+            // Material Keywords
+            #pragma shader_feature _METALLIC_SETUP _SPECULAR_SETUP
+            #pragma shader_feature _NORMALMAP
+            #pragma shader_feature _ALPHATEST_ON 
+            #pragma shader_feature _ALPHAPREMULTIPLY_ON
+            #pragma shader_feature _EMISSION
+            #pragma shader_feature _METALLICSPECGLOSSMAP
+            #pragma shader_feature _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+            #pragma shader_feature _OCCLUSIONMAP
+            #pragma shader_feature _DOUBLESIDED_ON
+            #pragma shader_feature _FORWARD_CLUSTER_FOG
+
+            #pragma shader_feature _BRDF_STANDARD _BRDF_ANISO
+
+            #pragma shader_feature _DETAIL
+            #pragma shader_feature _DETAIL_MULX2
+			#pragma shader_feature _DETAIL_MASK
+
+            #pragma multi_compile __ SCREEN_SHADOW
+			#pragma multi_compile __ VOLUMETRIC_FOG_ON
+			#pragma multi_compile __ SINGLE_DIR_LIGHT MULTIPLE_DIR_LIGHTS
+			#pragma multi_compile __ LOCAL_LIGHTS_ON
+			
+            #pragma multi_compile _ DEBUG_DISPLAY
+            #pragma multi_compile _ LIGHTMAP_ON
+            #pragma multi_compile _ DIRLIGHTMAP_COMBINED
+            #pragma multi_compile _ DYNAMICLIGHTMAP_ON
+            #pragma multi_compile _ SHADOWS_SHADOWMASK
+            #define SHADERPASS SHADERPASS_FORWARD
+			#include "../../../ShaderVariables.hlsl"
+			#include "../../WindData/WindData.hlsl"
+            #include "../../Material.hlsl"
+            #include "ShaderPass/LitSharePass.hlsl"
+            #include "../Lighting/LightingUtils.hlsl"
+			#include "GI_Module.hlsl"
+            #include "ShaderPassGI.hlsl"
+            			
+			ENDHLSL
+		}
+
         Pass
         {
             Name "ShadowCaster"
