@@ -1721,6 +1721,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1373696857}
+  - component: {fileID: 1373696858}
   m_Layer: 0
   m_Name: GI_Modules
   m_TagString: Untagged
@@ -1735,12 +1736,28 @@ Transform:
   m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 1373696856}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -13.131085, y: 3.308501, z: 5.3227944}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: 0.77, y: 5, z: -0.498}
+  m_LocalScale: {x: 24.6, y: 8.8, z: 9.64}
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1373696858
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 1373696856}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9db08020b79d4ba43a4e876c7b677be4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShowDebug: 0
+  IsDynamic: 0
+  NearPlane: 0.1
+  FarPlane: 1000
+  ProbeDimensions: {x: 4, y: 4, z: 4}
 --- !u!1 &1437254196 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 100770, guid: 75b9d64fc2656fc41bd44585711e9e74,
@@ -1884,7 +1901,7 @@ Camera:
     height: 1
   near clip plane: 0.3
   far clip plane: 1000
-  field of view: 60
+  field of view: 90
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
