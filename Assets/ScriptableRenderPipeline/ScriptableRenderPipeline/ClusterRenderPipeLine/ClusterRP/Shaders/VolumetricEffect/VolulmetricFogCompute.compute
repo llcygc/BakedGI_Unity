@@ -1,0 +1,85 @@
+// Each #kernel tells which function to compile; you can have many kernels
+
+#include "VolumetricSettings.hlsl"
+#include "../Lit/Lighting/ClusterData.cginc"
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+Texture3D<half4> VolumetricLightingTexture;
+RWTexture3D<half4> VolumetricLightingTextureLastFrame;
+RWTexture3D<half4> VolumetricFogTexture;
+
+groupshared half4 ldsScatteringExtinctions[128];
+
+#pragma kernel VolumetricFog
+
+[numthreads(8, 8, 1)]
+void VolumetricFog (uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+	uint3 coordId = uint3(globalIdx.x, globalIdx.y, globalIdx.z);
+
+	int startIndex = (coordId.x * FogClusterParams.y + coordId.y) * FogClusterParams.z;
+
+    half4 scatteringExtinction = VolumetricLightingTexture[coordId];
+	half extinction = scatteringExtinction.a;
+	half transmittance = exp(-scatteringExtinction.a * (ClusterDepthSlicesArray[1].x - ClusterDepthSlicesArray[0].x) * ClusterProjParams.y);
+	half4 scatteringTransmittance = half4(0, 0, 0, transmittance);
+
+	VolumetricFogTexture[uint3(coordId.xy, 0)] = scatteringTransmittance;
+	VolumetricLightingTextureLastFrame[uint3(coordId.xy, 0)] = scatteringExtinction;
+
+	[unroll]for (uint currentDepth = 1; currentDepth < 128; currentDepth++)
+	{
+		int actualIndex = startIndex + currentDepth;
+
+		const float stepLen = (ClusterDepthSlicesArray[currentDepth + 1].x - ClusterDepthSlicesArray[currentDepth].x) * ClusterProjParams.y;
+
+		scatteringExtinction = VolumetricLightingTexture[uint3(coordId.xy, currentDepth)];//VolumetricLightingBuffer[actualIndex];
+
+		half nonZeroExtinction = (extinction == 0) ? 1 : extinction;
+
+		scatteringTransmittance.rgb += scatteringExtinction.rgb * (1 - transmittance) / nonZeroExtinction * transmittance;
+
+		transmittance *= exp(-scatteringExtinction.a * stepLen);
+		extinction += scatteringExtinction.a;
+		scatteringTransmittance.a = transmittance;
+
+        VolumetricFogTexture[uint3(coordId.xy, currentDepth)] = scatteringTransmittance;
+		VolumetricLightingTextureLastFrame[uint3(coordId.xy, currentDepth)] = scatteringExtinction;
+		//ldsScatteringExtinctions[currentDepth] = scatteringTransmittance;
+	}
+	
+	//GroupMemoryBarrierWithGroupSync();
+
+}
+
+#pragma kernel VolumetricFog_PSVR
+
+[numthreads(1, 1, 1)]
+void VolumetricFog_PSVR(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+
+	float4 scatteringTransmittance = float4(0, 0, 0, 1);
+	float extinction = 0;
+	float transmittance = 1;
+
+	[loop]for (uint currentDepth = 0; currentDepth < CLUSTER_SLICES; currentDepth++)
+	{
+		uint3 coordId = uint3(groupIdx.x, groupIdx.y, currentDepth);
+
+		half4 scatteringExtinction = VolumetricLightingTexture.Load(int4(coordId.xyz, 0));
+
+		VolumetricLightingTextureLastFrame[coordId] = scatteringExtinction;
+
+		const float stepLen = (ClusterDepthSlicesBuffer[currentDepth + 1] - ClusterDepthSlicesBuffer[currentDepth]);
+
+		float nonZeroExtinction = (extinction == 0) ? 1 : extinction;
+
+		scatteringTransmittance.rgb += scatteringExtinction.rgb * (1 - transmittance) / nonZeroExtinction;
+
+		transmittance *= exp(-scatteringExtinction.a * stepLen);
+		extinction += scatteringExtinction.a;
+		scatteringTransmittance.a = transmittance;
+
+		VolumetricFogTexture[coordId] = scatteringTransmittance;
+	}
+}

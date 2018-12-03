@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 031bae7b0fc95ac4cab98810076f7653, type: 3}
+  m_Name: ClusterRenderPipelineResources
+  m_EditorClassIdentifier: 
+  debugDisplayLatlongShader: {fileID: 4800000, guid: 9ec5e553d7df982469a0da00369cea50,
+    type: 3}
+  debugViewMaterialGBufferShader: {fileID: 0}
+  debugViewTilesShader: {fileID: 4800000, guid: 44f14c974e2efbe4da4437e8729f734e,
+    type: 3}
+  debugFullScreenShader: {fileID: 4800000, guid: 57c800c88629683478953031387ab891,
+    type: 3}
+  clusterLightAssignmentCS: {fileID: 7200000, guid: 5283040cb141bb14eac3e96277aaf455,
+    type: 3}
+  volumetricLightingCS: {fileID: 7200000, guid: d1e79743ffdb3144a8589b2fe1abfb57,
+    type: 3}
+  volumetricFogMediaCS: {fileID: 7200000, guid: e5ae5b765e06b4d44942735bec6acffa,
+    type: 3}
+  volumetricFogAccumulateCS: {fileID: 7200000, guid: df31d8cf91cc2b64aab2f8e93d37d9f5,
+    type: 3}
+  deferredShader: {fileID: 0}
+  subsurfaceScatteringCS: {fileID: 0}
+  gaussianPyramidCS: {fileID: 0}
+  depthPyramidCS: {fileID: 0}
+  copyChannelCS: {fileID: 0}
+  applyDistortionCS: {fileID: 0}
+  clearDispatchIndirectShader: {fileID: 0}
+  buildDispatchIndirectShader: {fileID: 0}
+  buildScreenAABBShader: {fileID: 0}
+  buildPerTileLightListShader: {fileID: 0}
+  buildPerBigTileLightListShader: {fileID: 0}
+  buildPerVoxelLightListShader: {fileID: 0}
+  buildMaterialFlagsShader: {fileID: 0}
+  deferredComputeShader: {fileID: 0}
+  deferredDirectionalShadowComputeShader: {fileID: 0}
+  cameraMotionVectors: {fileID: 4800000, guid: d4af83beb78a47a4fab617ce401e9cde, type: 3}
+  shadowCasterShader: {fileID: 4800000, guid: f3b7289fa8d360b4899573b3334d1948, type: 3}
+  copyDepthBuffer: {fileID: 4800000, guid: 1a929c6c16c74a7499088cbf70f7d98c, type: 3}
+  blit: {fileID: 4800000, guid: 067608f65dcc6124cab7d5c8fe5f20a1, type: 3}
+  debugColorPickerShader: {fileID: 4800000, guid: 7900d6c8013f09f4bad89e8428042a71,
+    type: 3}
+  blitCubemap: {fileID: 4800000, guid: ee6c0cdf4cec1e144a9233c7041a405a, type: 3}
+  buildProbabilityTables: {fileID: 7200000, guid: fc456585cd0f59f419d5045a58bf0bb6,
+    type: 3}
+  computeGgxIblSampleData: {fileID: 7200000, guid: c94c129b93fc3c841935027a8a9d2eec,
+    type: 3}
+  GGXConvolve: {fileID: 4800000, guid: 57fd8997f266672448711edddef4c97f, type: 3}
+  opaqueAtmosphericScattering: {fileID: 4800000, guid: e69d945fa5458fb42abc2243869efb78,
+    type: 3}
+  skyboxCubemap: {fileID: 103, guid: 0000000000000000f000000000000000, type: 0}
+  encodeBC6HCS: {fileID: 0}
+  cubeToPanoShader: {fileID: 0}
+  blitCubeTextureFace: {fileID: 0}
+  shadowClearShader: {fileID: 4800000, guid: e3cab24f27741f44d8af1e94d006267c, type: 3}
+  shadowBlurMoments: {fileID: 7200000, guid: fb36979473602464fa32deacb9630c08, type: 3}
+  debugShadowMapShader: {fileID: 4800000, guid: ee25e539f5594f44085e0a9000c15d9b,
+    type: 3}
+  screenSpaceShadowShader: {fileID: 4800000, guid: c7dda8753aa799548b23738ae1f84a2e,
+    type: 3}
+  screenSpaceShadowCS: {fileID: 7200000, guid: 41cfd02db63edd3478d0c32b2b7e9128, type: 3}
+  TextureBlurCS: {fileID: 7200000, guid: 83cd2985fb3de8a429d249c3ff2cfaef, type: 3}
+  fogandAOCS: {fileID: 7200000, guid: 3304601eb4c64f844bd43c4fdf42cf8c, type: 3}
+  colorGradingCS: {fileID: 7200000, guid: c6e5559350125574db8b9a3f8bec195f, type: 3}
+  stencilMaskGenCS: {fileID: 7200000, guid: 235670c40c8d0514aa4ec9f219dbcd1f, type: 3}
+  gradientResolveCS: {fileID: 0}
+  expandMaskedBufferCS: {fileID: 7200000, guid: 817f4f6ce09350145a9b1d71e4b710a7,
+    type: 3}
+  toneMappingCS: {fileID: 0}
+  stencilMaskBlit: {fileID: 4800000, guid: 7626b496a02119a4a9e498b8d233925d, type: 3}
+  stencilMaskTexture: {fileID: 0}

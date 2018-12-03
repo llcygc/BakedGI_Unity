@@ -1,0 +1,10 @@
+#include "PostProcessVariables.hlsl"
+
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel ColorGrading
+
+[numthreads(8,8,1)]
+void ColorGrading(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+
+}

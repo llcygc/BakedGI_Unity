@@ -1,0 +1,18 @@
+{
+    "name": "com.viva.render-pipelines.cluster-pipeline.Editor",
+    "references": [
+        "com.unity.render-pipelines.core.Runtime",
+        "com.unity.render-pipelines.core.Editor",
+        "com.viva.render-pipelines.cluster-pipeline.Runtime",
+        "com.unity.postprocessing.Runtime",
+        "com.unity.postprocessing.Editor",
+        "com.unity.render-pipelines.render-graph.Runtime",
+        "com.unity.render-pipelines.render-graph.Editor"
+    ],
+    "optionalUnityReferences": [],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true
+}

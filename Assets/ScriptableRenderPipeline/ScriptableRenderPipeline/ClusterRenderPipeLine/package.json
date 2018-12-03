@@ -1,0 +1,11 @@
+{
+    "name": "com.unity.render-pipelines.cluster-pipeline",
+    "description": "Cluster Render Pipeline for Unity.",
+    "version": "1.0.0-beta",
+    "unity": "2018.1",
+    "dependencies": {
+        "com.unity.postprocessing": "2.0.0-beta",
+        "com.unity.render-pipelines.core": "0.1.33",
+        "com.unity.render-pipelines.render-graph": "0.0.1-alpha"
+    }
+}

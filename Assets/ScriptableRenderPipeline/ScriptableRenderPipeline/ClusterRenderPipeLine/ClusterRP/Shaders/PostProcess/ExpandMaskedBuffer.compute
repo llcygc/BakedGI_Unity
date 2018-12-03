@@ -1,0 +1,85 @@
+#include "PostProcessVariables.hlsl"
+
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel ExpandMaskedBuffer
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RW_TEXTURE2D(half4, MainColorBuffer);
+RW_TEXTURE2D(half2, MainVelocityBuffer);
+RW_TEXTURE2D(float, MainDepthBuffer);
+RW_TEXTURE2D(half, _R8Buffer);
+
+[numthreads(8,8,1)]
+void ExpandMaskedBuffer (uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+    const int2 pixelCoord = globalIdx.xy;
+    half mask = _R8Buffer[pixelCoord].x;
+    if (mask < 1.0)
+    {
+        int xOffset = ((uint)pixelCoord.x % 2) * 2 - 1;
+        int yOffset = ((uint)pixelCoord.y % 2) * 2 - 1;
+        int2 coord_0 = pixelCoord + int2(xOffset, 0);
+        int2 coord_1 = pixelCoord + int2(0, yOffset);
+        int2 coord_2 = pixelCoord + int2(xOffset, yOffset);
+        const half m0 = _R8Buffer[coord_0].x;
+        const half m1 = _R8Buffer[coord_1].x;
+        const half m2 = _R8Buffer[coord_2].x;
+        half4 sumColor = 0;
+        half2 sumVelocity = 0;
+        float sumDepth = 0;
+        if (m0 > 0.0) { sumColor += MainColorBuffer[coord_0]; sumVelocity += MainVelocityBuffer[coord_0];  /*sumDepth = MainDepthBuffer[coord_0];*/ }
+        if (m1 > 0.0) { sumColor += MainColorBuffer[coord_1]; sumVelocity += MainVelocityBuffer[coord_1];  /*sumDepth = MainDepthBuffer[coord_1];*/ }
+        if (m2 > 0.0) { sumColor += MainColorBuffer[coord_2]; sumVelocity += MainVelocityBuffer[coord_2];  /*sumDepth = MainDepthBuffer[coord_2];*/ }
+
+        const float weight = rcp(max(1.0, m0 + m1 + m2));
+
+        MainColorBuffer[pixelCoord] = sumColor * weight;
+        MainVelocityBuffer[pixelCoord] = sumVelocity * weight;
+        //MainDepthBuffer[pixelCoord] = sumDepth * weight;
+    }
+}
+
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel ExpandMaskedBufferStereo
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RW_TEXTURE2D_ARRAY(half4, MainColorBufferStereo);
+RW_TEXTURE2D_ARRAY(half2, MainVelocityBufferStereo);
+RW_TEXTURE2D_ARRAY(float, MainDepthBufferStereo);
+
+[numthreads(8, 8, 1)]
+void ExpandMaskedBufferStereo(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+    const int3 pixelCoord = globalIdx;
+
+    float2 zoneCoord = groupIdx.xy / _GroupSize.xy;
+    zoneCoord = abs(zoneCoord * 2.0f - 1.0f) - 2.0f / _GroupSize.xy;
+    float length = dot(zoneCoord, zoneCoord);
+
+    half mask = _R8Buffer[pixelCoord.xy].x;
+    half4 current_sample;
+    if (mask < 1.0 && length <= 1.0)
+    {
+        int xOffset = ((uint)pixelCoord.x % 2) * 2 - 1;
+        int yOffset = ((uint)pixelCoord.y % 2) * 2 - 1;
+        int3 coord_0 = pixelCoord + int3(xOffset, 0, 0);
+        int3 coord_1 = pixelCoord + int3(0, yOffset, 0);
+        int3 coord_2 = pixelCoord + int3(xOffset, yOffset, 0);
+        const half m0 = _R8Buffer[coord_0.xy].x;
+        const half m1 = _R8Buffer[coord_1.xy].x;
+        const half m2 = _R8Buffer[coord_2.xy].x;
+        half4 sumColor = 0;
+        half2 sumVelocity = 0;
+        if (m0 > 0.0) { sumColor += MainColorBufferStereo[coord_0]; /*sumVelocity += MainVelocityBufferStereo[coord_0];  sumDepth = MainDepthBufferStereo[coord_0];*/ }
+        if (m1 > 0.0) { sumColor += MainColorBufferStereo[coord_1]; /*sumVelocity += MainVelocityBufferStereo[coord_1];  sumDepth = MainDepthBufferStereo[coord_1];*/ }
+        if (m2 > 0.0) { sumColor += MainColorBufferStereo[coord_2]; /*sumVelocity += MainVelocityBufferStereo[coord_2];  sumDepth = MainDepthBufferStereo[coord_2];*/ }
+
+        const float weight = rcp(max(1.0, m0 + m1 + m2));
+
+        MainColorBufferStereo[pixelCoord] = half4(sumColor.rgb * weight, 1.0);
+        //MainVelocityBufferStereo[pixelCoord] = sumVelocity * weight;
+        //MainDepthBufferStereo[pixelCoord] = sumDepth * weight;
+    }
+}

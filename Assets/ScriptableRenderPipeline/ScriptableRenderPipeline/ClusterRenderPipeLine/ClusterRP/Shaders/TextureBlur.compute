@@ -1,0 +1,240 @@
+#define THREADS 8
+
+#include "CoreRP/ShaderLibrary/Common.hlsl"
+#include "CoreRP/ShaderLibrary/Shadow/ShadowSamplingTent.hlsl"
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+Texture2D<float> SourceTexture;
+SamplerState samplerSourceTexture;
+
+RWTexture2D<float> DestinationTexture;
+
+CBUFFER_START(TextureBlur)
+float4 SizeOffset;
+float4 _Tent7X7_UV_Weights[16];
+CBUFFER_END
+//
+//const float BlurOffset[3] = { 0.0, 1.3846153846, 3.2307692308 };
+//const float BlurWeights[3] = { 0.2270270270, 0.3162162162, 0.0702702703 };
+
+#pragma kernel TexturBlur_Horizontal_9_Linear
+
+[numthreads(THREADS, THREADS, 1)]
+void TexturBlur_Horizontal_9_Linear(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+	// TODO: insert actual code here!
+	int indexX = groupIdx.x * THREADS + localIdx.x;
+	int indexY = groupIdx.y * THREADS + localIdx.y;
+
+	float sum = 0;
+
+	float BlurOffset[3] = { 0.0, 1.3846153846, 3.2307692308 };
+	float BlurWeights[3] = { 0.2270270270, 0.3162162162, 0.0702702703 };
+
+	float weightSum = BlurWeights[0] + BlurWeights[1] * 2 + BlurWeights[2] * 2;
+
+	int4 shadowPerLightID = int4(indexX, indexY, indexX + SizeOffset.z, indexY + SizeOffset.w);
+
+    float2 centerCoord = float2(shadowPerLightID.zw / 4096.0);
+
+	for (int i = 0; i < 5; i++)
+	{
+		int offsetIndex = i - 2;
+		float nSign = offsetIndex >= 0 ? 1.0f : -1.0f;
+		float2 actualCoord = saturate(centerCoord + float2(BlurOffset[abs(offsetIndex)] * nSign / SizeOffset.x, 0));
+		sum += SourceTexture.SampleLevel(samplerSourceTexture, actualCoord, 0) * BlurWeights[abs(offsetIndex)];
+
+		/*int offsetIndex = (i - 2);
+		float nSign = offsetIndex >= 0 ? 1.0f : -1.0f;
+		float coord = clamp(shadowPerLightID.x + BlurOffset[abs(offsetIndex)] * nSign, 0, SizeOffset.y - 1);
+		float coordID = floor(coord);
+		float nextCoord = min(coordID + 1, SizeOffset.y - 1);
+		float val = lerp(DestinationTexture[int2(coordID, shadowPerLightID.y)].x, DestinationTexture[int2(nextCoord, shadowPerLightID.y)].x, coord - coordID);
+		sum += val * BlurWeights[abs(offsetIndex)];*/
+	}
+
+    DestinationTexture[shadowPerLightID.zw] = sum;
+}
+
+#pragma kernel TexturBlur_Vertical_9_Linear
+
+[numthreads(THREADS, THREADS, 1)]
+void TexturBlur_Vertical_9_Linear(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+	int indexX = groupIdx.x * THREADS + localIdx.x;
+	int indexY = groupIdx.y * THREADS + localIdx.y;
+
+	float sum = 0;
+
+	const float BlurOffset[3] = { 0.0, 1.3846153846, 3.2307692308 };
+	const float BlurWeights[3] = { 0.2270270270, 0.3162162162, 0.0702702703 };
+
+	int4 shadowPerLightID = int4(indexX, indexY, indexX + SizeOffset.z, indexY + SizeOffset.w);
+
+	float2 centerCoord = float2(shadowPerLightID.zw / 4096.0f);
+
+	for (int i = 0; i < 5; i++)
+	{
+		int offsetIndex = (i - 2);
+		float nSign = offsetIndex >= 0 ? 1.0f : -1.0f;
+		float coord = clamp(shadowPerLightID.w + BlurOffset[abs(offsetIndex)] * nSign, SizeOffset.w, SizeOffset.y + SizeOffset.w - 1);
+		float coordID = floor(coord);
+		float nextCoord = min(coordID + 1, SizeOffset.y + SizeOffset.w - 1);
+		float val = lerp(DestinationTexture[int2(shadowPerLightID.z, coordID)].x, DestinationTexture[int2(shadowPerLightID.z, nextCoord)].x, coord - coordID);
+		sum += val * BlurWeights[abs(offsetIndex)];
+
+		/*int offsetIndex = i - 2;
+		float nSign = offsetIndex >= 0 ? 1.0f : -1.0f;
+		float2 actualCoord = saturate(centerCoord + float2(0, BlurOffset[abs(offsetIndex)] * nSign / SizeOffset.x));
+		sum += SourceTexture.SampleLevel(samplerSourceTexture, actualCoord, 0) * BlurWeights[abs(offsetIndex)];*/
+	}
+
+    DestinationTexture[shadowPerLightID.zw] = sum;
+}
+
+#pragma kernel TexturBlur_Tent_7x7
+
+[numthreads(THREADS, THREADS, 1)]
+void TexturBlur_Tent_7x7(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+    int indexX = groupIdx.x * THREADS + localIdx.x;
+    int indexY = groupIdx.y * THREADS + localIdx.y;
+
+    float sum = 0;
+
+    float fetchesWeights[16];
+    float2 fetchesUV[16];
+    int4 shadowPerLightID = int4(indexX, indexY, indexX + SizeOffset.z, indexY + SizeOffset.w);
+    float2 centerCoord = float2(shadowPerLightID.zw / 4096.0f);
+    float4 shadowmapSize = float4(1.0f / 4096.0f, 1.0f/ 4096.0f, 4096.0f, 4096.0f);
+    SampleShadow_ComputeSamples_Tent_7x7(shadowmapSize, centerCoord, fetchesWeights, fetchesUV);
+
+    for (int i = 0; i < 16; i++)
+        sum += fetchesWeights[i] * SourceTexture.SampleLevel(samplerSourceTexture, fetchesUV[i], 0);
+
+    DestinationTexture[shadowPerLightID.zw] = sum;
+}
+
+#pragma kernel TexturBlur_Tent_7x7_Read
+
+[numthreads(THREADS, THREADS, 1)]
+void TexturBlur_Tent_7x7_Read(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+    int indexX = groupIdx.x * THREADS + localIdx.x;
+    int indexY = groupIdx.y * THREADS + localIdx.y;
+
+    float sum = 0;
+
+    float fetchesWeights[16];
+    float2 fetchesUV[16];
+    int4 shadowPerLightID = int4(indexX, indexY, indexX + SizeOffset.z, indexY + SizeOffset.w);
+    float2 centerCoord = float2(shadowPerLightID.zw / 4096.0f);
+
+    [loop]for (int i = 0; i < 16; i++)
+        sum += _Tent7X7_UV_Weights[i].z * SourceTexture.SampleLevel(samplerSourceTexture, centerCoord + _Tent7X7_UV_Weights[i].xy, 0);
+
+    DestinationTexture[shadowPerLightID.zw] = sum;
+}
+
+#pragma kernel TexturBlur_Tent_7x7_LDS_8
+groupshared float ldsShadowmapData[16][16];
+[numthreads(8, 8, 1)]
+void TexturBlur_Tent_7x7_LDS_8(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+    int indexX = groupIdx.x * THREADS + localIdx.x;
+    int indexY = groupIdx.y * THREADS + localIdx.y;
+
+    int4 shadowPerLightID = int4(indexX, indexY, indexX + SizeOffset.z, indexY + SizeOffset.w);
+    ldsShadowmapData[localIdx.x][localIdx.y] = LOAD_TEXTURE2D(SourceTexture, shadowPerLightID.zw);
+
+    GroupMemoryBarrierWithGroupSync();
+
+    float2 centerCoord = float2(shadowPerLightID.zw / 4096.0f);
+    float sum = 0;
+
+    [loop]for (int i = 0; i < 16; i++)
+    {
+        float2 offsetUV = _Tent7X7_UV_Weights[i].xy * 4096.0f - 0.5f;
+        float2 coord = floor(offsetUV);
+        float2 offsetPercent = offsetUV - coord;
+
+        float2 localCoord = coord + (int2)localIdx.xy;
+        float valX = ldsShadowmapData[localCoord.x][localCoord.y];
+        float valXNext = ldsShadowmapData[localCoord.x + 1][localCoord.y];
+        float valY = ldsShadowmapData[localCoord.x][localCoord.y + 1];
+        float valYNext = ldsShadowmapData[localCoord.x + 1][localCoord.y + 1];
+
+        float valH = lerp(valX, valXNext, offsetPercent.x);
+        float valHNext = lerp(valY, valYNext, offsetPercent.x);
+
+        float destVal = lerp(valH, valHNext, offsetPercent.y);
+        sum += destVal * _Tent7X7_UV_Weights[i].z;
+    }
+
+    DestinationTexture[shadowPerLightID.zw] = sum;
+}
+
+#pragma kernel TexturBlur_BOX_TWOPASS
+groupshared float ldsShadowmapData_BOX[10][10];
+[numthreads(10, 10, 1)]
+void TexturBlur_BOX_TWOPASS(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+    int ldsIndex = localIdx.x * 10 + localIdx.y;
+
+    int indexX = groupIdx.x * THREADS + localIdx.x - 1;
+    int indexY = groupIdx.y * THREADS + localIdx.y - 1;
+
+    clamp(indexX, 0, (int)SizeOffset.x);
+    clamp(indexY, 0, (int)SizeOffset.y);
+
+    int2 actualIndex = int2(indexX + SizeOffset.z, indexY + SizeOffset.w);
+
+    ldsShadowmapData_BOX[localIdx.x][localIdx.y] = LOAD_TEXTURE2D(SourceTexture, actualIndex);
+
+    GroupMemoryBarrierWithGroupSync();
+
+    if (localIdx.x != 9 && localIdx.y != 9 && localIdx.x != 0 && localIdx.y != 0)
+    {
+        float sum = 0;
+        for (uint i = 0; i < 9; i++)
+        {
+            int offsetX = i % 3 - 1;
+            int offsetY = floor(i / 3) - 1;
+            sum += ldsShadowmapData_BOX[localIdx.x + offsetX][localIdx.y + offsetY];
+        }
+
+        DestinationTexture[actualIndex] = sum / 9.0f;
+    }
+}
+
+#pragma kernel TexturBlur_BOX_TWOPASS_2
+[numthreads(10, 10, 1)]
+void TexturBlur_BOX_TWOPASS_2(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+    int ldsIndex = localIdx.x * 10 + localIdx.y;
+
+    int indexX = groupIdx.x * THREADS + localIdx.x - 1;
+    int indexY = groupIdx.y * THREADS + localIdx.y - 1;
+
+    clamp(indexX, 0, (int)SizeOffset.x);
+    clamp(indexY, 0, (int)SizeOffset.y);
+
+    int2 actualIndex = int2(indexX + SizeOffset.z, indexY + SizeOffset.w);
+
+    ldsShadowmapData_BOX[localIdx.x][localIdx.y] = DestinationTexture[actualIndex];
+
+    GroupMemoryBarrierWithGroupSync();
+
+    if (localIdx.x != 9 && localIdx.y != 9 && localIdx.x != 0 && localIdx.y != 0)
+    {
+        float sum = 0;
+        for (uint i = 0; i < 9; i++)
+        {
+            int offsetX = i % 3 - 1;
+            int offsetY = floor(i / 3) - 1;
+            sum += ldsShadowmapData_BOX[localIdx.x + offsetX][localIdx.y + offsetY];
+        }
+
+        DestinationTexture[actualIndex] = sum / 9.0f;
+    }
+}

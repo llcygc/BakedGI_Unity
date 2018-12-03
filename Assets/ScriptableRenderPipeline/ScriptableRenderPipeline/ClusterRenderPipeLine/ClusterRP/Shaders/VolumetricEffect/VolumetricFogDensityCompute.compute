@@ -1,0 +1,180 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#include "VolumetricSettings.hlsl"
+#include "../Lit/Lighting/ClusterData.cginc"
+#include "../Lit/Lighting/ClusterUtils.cginc"
+#include "../RandomNoise.cginc"
+
+struct VolumeEffectData
+{
+    float4 colorExtinction;
+    float4 animationDir;
+    float4 noiseScaleContrast;
+    float4 noiseClampRange;
+    float4x4 worldToLocalMatrix;
+};
+
+RWTexture3D<half4> VolumetricLightingTexture;
+
+Texture3D<half4> VolumetricLightingTextureLastFrame;
+SamplerState samplerVolumetricLightingTextureLastFrame;
+
+Texture3D<half4> PerlinTexture;
+SamplerState samplerPerlinTexture;
+
+groupshared float3 ldsFarWsArray[16];
+StructuredBuffer<VolumeEffectData> _VolumeEffectData;
+int _VolumeEffectCount;
+
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel VolumetricFogMedia
+
+[numthreads(4, 4, 16)]
+void VolumetricFogMedia(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+    uint localIndex = localIdx.y * 4 + localIdx.x;
+
+    if (localIdx.z == 0)
+    {
+        ldsFarWsArray[localIndex] = ClusterID2FarPos(half3(globalIdx.x, globalIdx.y, globalIdx.z) + HaltonSequence, FogClusterParams);
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    //float4 farPos = float4(asfloat(ldsPosWs.x), asfloat(ldsPosWs.y), asfloat(ldsPosWs.z), 1.0);
+    //float nearDepth = ClusterDepthSlicesBuffer[clusterId.z];
+    //float farDepth = ClusterDepthSlicesBuffer[localIdx.x + 1];//To do
+    //float nearDepth = ClusterDepthSlicesBuffer[localIdx.x];//To do
+    float farDepth = ClusterDepthSlicesArray[globalIdx.z + 1].x;//To do
+    float nearDepth = ClusterDepthSlicesArray[globalIdx.z].x;//To do	
+    float actualDepth = nearDepth + (farDepth - nearDepth) * HaltonSequence.z; //(farDepth + nearDepth) / 2;//
+    float3 worldPos = CameraPos + (ldsFarWsArray[localIndex] - CameraPos) * actualDepth;
+
+    half4 colorDensity = 0;
+
+    half p = ( GlobalFogParams.y - worldPos.y) / (GlobalFogParams.y - GlobalFogParams.x);
+    int pos = clamp(floor(p * 255.0), 0, 255);
+    half fraction = p * 255.0 - pos;
+    float4 fogMedia = (pos == 0 || pos == 255) ? FogMediaGradient[pos] : FogMediaGradient[pos] * (1 - fraction) + FogMediaGradient[pos + 1] * fraction;//SAMPLE_TEX2D_LOD(GlobalFogMediaTexture, float2(p, 0), 0);
+
+    float f = 1.0;
+
+    if (noiseScale.w > 0)
+    {
+        float3 q = (worldPos) * noiseScale.xyz + velocityPhg.xyz * _TimeFog;
+        f = 0.5000*noise(q); q = q * 5.01;
+        f += 0.2500*noise(q); q = q * 2.02;
+
+        f *= f;
+
+        clamp(f, 0.9f, 1.0f);
+    }
+
+    half extinction = GlobalFogParams.z * fogMedia.w * f;
+    colorDensity.a = extinction;
+    half3 albedo = (fogMedia.xyz) * extinction / 12.56;
+
+    colorDensity.rgb = albedo * GlobalFogParams.w;
+
+    VolumetricLightingTexture[uint3(globalIdx.x, globalIdx.y, globalIdx.z)] = colorDensity;
+}
+
+
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel VolumetricFogMedia_WithLocalVolume
+
+[numthreads(4, 4, 16)]
+void VolumetricFogMedia_WithLocalVolume(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+    uint localIndex = localIdx.y * 4 + localIdx.x;
+
+    if (localIdx.z == 0)
+    {
+        ldsFarWsArray[localIndex] = ClusterID2FarPos(half3(globalIdx.x, globalIdx.y, globalIdx.z) + HaltonSequence, FogClusterParams);
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    //float4 farPos = float4(asfloat(ldsPosWs.x), asfloat(ldsPosWs.y), asfloat(ldsPosWs.z), 1.0);
+    //float nearDepth = ClusterDepthSlicesBuffer[clusterId.z];
+    //float farDepth = ClusterDepthSlicesBuffer[localIdx.x + 1];//To do
+    //float nearDepth = ClusterDepthSlicesBuffer[localIdx.x];//To do
+    float farDepth = ClusterDepthSlicesArray[globalIdx.z + 1].x;//To do
+    float nearDepth = ClusterDepthSlicesArray[globalIdx.z].x;//To do	
+    float actualDepth = nearDepth + (farDepth - nearDepth) * HaltonSequence.z; //(farDepth + nearDepth) / 2;//
+    float3 worldPos = CameraPos + (ldsFarWsArray[localIndex] - CameraPos) * actualDepth;
+
+    half4 colorDensity = 0;
+
+    bool haveLocalVolume = false;
+    //float4 _noiseScale;
+    float3 velocity;
+
+    float f = 1.0;
+
+    [loop]for (int i = 0; i < _VolumeEffectCount; i++)
+    {
+        VolumeEffectData vData = _VolumeEffectData[i];
+        float4 localPos = mul(vData.worldToLocalMatrix, float4(worldPos, 1.0f));
+        localPos /= localPos.w;
+        float3 abPos = abs(localPos);
+        bool3 inside = abPos > 0.5;
+        if (any(inside))
+            continue;
+        
+        float3 q = (worldPos) * vData.noiseScaleContrast.xyz + vData.animationDir * _TimeFog;
+        f = 0.5000*noise(q); q = q * 2.01;
+        f += 0.2500*noise(q); q = q * 2.02;
+
+        f *= f;
+
+        float edgeDist = max(max(abPos.x, abPos.y), abPos.z) * 2;
+        float r = vData.noiseScaleContrast.w;
+        float edgeFactor = 1 - saturate((edgeDist - 1) / r + 1);
+
+        f *= edgeFactor;
+
+        half4 localColor = vData.colorExtinction;
+        localColor.a *= f;
+        haveLocalVolume = true;
+        if (colorDensity.a == 0)
+            colorDensity = localColor;
+        else
+        {
+            colorDensity.a += localColor.a;
+            half blendFactor = localColor.a / colorDensity.a;
+            colorDensity.rgb = colorDensity.rgb * (1 - blendFactor) + localColor * blendFactor;
+        }
+    }
+
+    if (!haveLocalVolume)
+    {
+        half p = (GlobalFogParams.y - worldPos.y) / (GlobalFogParams.y - GlobalFogParams.x);
+        int pos = clamp(floor(p * 255.0), 0, 255);
+        half fraction = p * 255.0 - pos;
+        float4 fogMedia = (pos == 0 || pos == 255) ? FogMediaGradient[pos] : FogMediaGradient[pos] * (1 - fraction) + FogMediaGradient[pos + 1] * fraction;//SAMPLE_TEX2D_LOD(GlobalFogMediaTexture, float2(p, 0), 0);
+
+
+        half extinction = GlobalFogParams.z * fogMedia.w;
+        colorDensity.a = extinction;
+        half3 albedo = (fogMedia.xyz) * extinction / 12.56;
+
+        colorDensity.rgb = albedo * GlobalFogParams.w;
+
+        if (noiseScale.w > 0)
+        {
+            float3 q = (worldPos) / 10.0f + velocityPhg.xyz * _TimeFog;
+            f = 0.5000*noise(q); q = q * 2.01;
+            f += 0.2500*noise(q); q = q * 2.02;
+
+            f *= f;
+
+            clamp(f, noiseClampRange.x, noiseClampRange.y);
+        }
+
+        colorDensity.a *= f;
+    }
+
+
+    VolumetricLightingTexture[uint3(globalIdx.x, globalIdx.y, globalIdx.z)] = colorDensity;
+}
+

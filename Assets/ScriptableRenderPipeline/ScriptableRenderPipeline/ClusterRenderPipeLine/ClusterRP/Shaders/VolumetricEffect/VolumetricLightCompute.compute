@@ -1,0 +1,415 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#include "CoreRP/ShaderLibrary/Common.hlsl"
+#include "VolumetricSettings.hlsl"
+#include "../Lit/Lighting/ClusterUtils.cginc"
+#include "../ShadowUtils.cginc"
+#include "../RandomNoise.cginc"
+
+RWTexture3D<half4> VolumetricLightingTexture;
+
+Texture3D<half4> VolumetricLightingTextureLastFrame;
+SamplerState samplerVolumetricLightingTextureLastFrame;
+
+
+groupshared float3 ldsFarWsArray[16];
+groupshared float3 ldsFarCenterWsArray[16];
+groupshared int ldsLastIndexArray[16];
+
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel VolumetricLighting
+
+[numthreads(4, 4, 16)]
+void VolumetricLighting (uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+    uint localIndex = localIdx.y * 4 + localIdx.x;
+
+    if (localIdx.z == 0)
+    {
+        ldsFarWsArray[localIndex] = ClusterID2FarPos(half3(globalIdx.x, globalIdx.y, globalIdx.z) + HaltonSequence, FogClusterParams);
+        ldsLastIndexArray[localIndex] = (floor(globalIdx.x * CullingClusterParams.x / FogClusterParams.x) * CullingClusterParams.y + floor(globalIdx.y * CullingClusterParams.y / FogClusterParams.y)) * CullingClusterParams.z * 4;
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    //float4 farPos = float4(asfloat(ldsPosWs.x), asfloat(ldsPosWs.y), asfloat(ldsPosWs.z), 1.0);
+    //float nearDepth = ClusterDepthSlicesBuffer[clusterId.z];
+    //float farDepth = ClusterDepthSlicesBuffer[localIdx.x + 1];//To do
+    //float nearDepth = ClusterDepthSlicesBuffer[localIdx.x];//To do
+    float farDepth = ClusterDepthSlicesArray[globalIdx.z + 1].x;//To do
+    float nearDepth = ClusterDepthSlicesArray[globalIdx.z].x;//To do	
+    float actualDepth = nearDepth + (farDepth - nearDepth) * HaltonSequence.z; //(farDepth + nearDepth) / 2;//
+    float3 worldPos = CameraPos + (ldsFarWsArray[localIndex] - CameraPos) * actualDepth;
+    float3 viewDir = normalize(CameraPos - worldPos);
+
+    float k = velocityPhg.w;
+    half4 colorDensity = 0;
+    for (int idx = 0; idx < _DirectionalLightCount; idx++)
+    {
+        DirectionalLightDataSimple dirLight = _DirectionalLightsDataSimpleBuffer[idx];
+        float3 vPositionToLightDirWs = -dirLight.ForwardCosAngle.xyz;
+
+        float lightAtten = 1.0;
+
+        lightAtten = Compute_Direction_Light_Shadow(worldPos, dirLight);
+        float cosTheta = dot(viewDir, -vPositionToLightDirWs);
+        float phg = (1 - k * k) / (pow(1 - cosTheta * k, 2));
+
+        half3 dirLightColor = /*lerp(backfaceColor.rgb, dirLight.Color.xyz,  phg) **/ lightAtten * dirLight.Color.xyz * phg;
+
+        colorDensity.rgb += dirLightColor;
+    }
+
+    int loopCount = 0;
+
+    uint startOffsetAddress = ldsLastIndexArray[localIndex] + globalIdx.z * 4;
+    uint nextNode = ClusterStartOffsetIndexIn.Load(startOffsetAddress);
+
+    [loop] while (loopCount < _PunctualLightCount && nextNode != 0xFFFFFFFF)
+    {
+        loopCount++;
+
+        uint lightLinkNode = ClusterLightsLinkListIn[nextNode];
+        uint nextNodeId = lightLinkNode | 0xFF000000;
+        if (nextNodeId != 0xFFFFFFFF)
+            nextNode = lightLinkNode & 0xFFFFFF;
+        else
+            nextNode = 0xFFFFFFFF;
+
+        uint lightId = lightLinkNode >> 24;
+
+        LightRenderingData lightRenderingData = AllLightsRenderingData[lightId];
+        LightGeoData lightData = AllLightList[lightId];
+
+		if (lightRenderingData.AffectVolumetricLight == 0)
+			continue;
+
+        float3 vPosition2LightRayWs = lightData.PositionSizeSqr.xyz - worldPos;
+        float wsPos2LightSq = dot(vPosition2LightRayWs.xyz, vPosition2LightRayWs.xyz);
+
+        float lightAtten = 1.0;
+
+        int lightType = 2; //Spot Light;
+        if (lightData.PositionSizeSqr.w < 0)
+            lightType = 0; //Directional Light
+        else if (lightData.ForwardCosAngle.w < 0)
+            lightType = 1; //Point Light
+		
+		lightAtten = Compute_Light_Attenuation(worldPos, lightRenderingData.ShadowIndex, lightRenderingData.CookieIndex, true);
+
+        if (lightData.PositionSizeSqr.w > 0 && (wsPos2LightSq > lightData.PositionSizeSqr.w))
+            continue;
+
+        float3 vPositionToLightDirWs = lightData.PositionSizeSqr.w > 0 ? normalize(vPosition2LightRayWs.xyz) : -lightData.ForwardCosAngle.xyz;
+        float flTemp = min(dot(-vPositionToLightDirWs.xyz, lightData.ForwardCosAngle.xyz) - lightData.ForwardCosAngle.w, 1.0);
+
+        if (flTemp <= 0.0 && lightData.PositionSizeSqr.w > 0)
+            continue;
+
+        float fallOffParam = lightData.PositionSizeSqr.w > 0 ? (1.0 - pow(wsPos2LightSq / lightData.PositionSizeSqr.w, 0.175)) : 1.0;
+        float spotLightAtten = saturate(flTemp * lightRenderingData.Color.w);
+
+        float cookieAtten = 1.0;
+        float cosTheta = dot(viewDir, -vPositionToLightDirWs.xyz);
+        float phg = (1 - k * k) / (pow(1 - cosTheta * k, 2));
+
+        float atten = spotLightAtten * fallOffParam * lightAtten * cookieAtten * phg;
+
+        colorDensity.rgb += lightRenderingData.Color.xyz * atten;
+    }
+
+    half4 albedoExtinction = VolumetricLightingTexture[uint3(globalIdx.x, globalIdx.y, globalIdx.z)];
+    albedoExtinction.rgb = colorDensity.rgb * albedoExtinction.xyz + ambientColor * albedoExtinction.a;
+    VolumetricLightingTexture[uint3(globalIdx.x, globalIdx.y, globalIdx.z)] = albedoExtinction;
+}
+
+
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel VolumetricLighting_Dynamic
+
+[numthreads(4, 4, 16)]
+void VolumetricLighting_Dynamic(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+    uint localIndex = localIdx.y * 4 + localIdx.x;
+
+    if (localIdx.z == 0)
+    {
+        ldsFarWsArray[localIndex] = ClusterID2FarPos(half3(globalIdx.x, globalIdx.y, globalIdx.z) + HaltonSequence, FogClusterParams);
+        ldsLastIndexArray[localIndex] = (floor(globalIdx.x * CullingClusterParams.x / FogClusterParams.x) * CullingClusterParams.y + floor(globalIdx.y * CullingClusterParams.y / FogClusterParams.y)) * CullingClusterParams.z * 4;
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    //float4 farPos = float4(asfloat(ldsPosWs.x), asfloat(ldsPosWs.y), asfloat(ldsPosWs.z), 1.0);
+    //float nearDepth = ClusterDepthSlicesBuffer[clusterId.z];
+    //float farDepth = ClusterDepthSlicesBuffer[localIdx.x + 1];//To do
+    //float nearDepth = ClusterDepthSlicesBuffer[localIdx.x];//To do
+    float farDepth = ClusterDepthSlicesArray[globalIdx.z + 1].x;//To do
+    float nearDepth = ClusterDepthSlicesArray[globalIdx.z].x;//To do	
+    float actualDepth = nearDepth + (farDepth - nearDepth) * HaltonSequence.z; //(farDepth + nearDepth) / 2;//
+    float3 worldPos = CameraPos + (ldsFarWsArray[localIndex] - CameraPos) * actualDepth;
+    float3 viewDir = normalize(CameraPos - worldPos);
+
+    float k = velocityPhg.w;
+    half4 colorDensity = 0;
+    for (int idx = 0; idx < _DirectionalLightCount; idx++)
+    {
+        DirectionalLightDataSimple dirLight = _DirectionalLightsDataSimpleBuffer[idx];
+        float3 vPositionToLightDirWs = -dirLight.ForwardCosAngle.xyz;
+
+        float lightAtten = 1.0;
+
+        lightAtten = Compute_Direction_Light_Shadow_Dynamic(worldPos, dirLight);
+        float cosTheta = dot(viewDir, -vPositionToLightDirWs);
+        float phg = (1 - k * k) / (pow(1 - cosTheta * k, 2));
+
+        half3 dirLightColor = /*lerp(backfaceColor.rgb, dirLight.Color.xyz,  phg) **/ lightAtten * dirLight.Color.xyz * phg;
+
+        colorDensity.rgb += dirLightColor;
+    }
+
+    int loopCount = 0;
+
+    uint startOffsetAddress = ldsLastIndexArray[localIndex] + globalIdx.z * 4;
+    uint nextNode = ClusterStartOffsetIndexIn.Load(startOffsetAddress);
+
+    [loop] while (loopCount < _PunctualLightCount && nextNode != 0xFFFFFFFF)
+    {
+        loopCount++;
+
+        uint lightLinkNode = ClusterLightsLinkListIn[nextNode];
+        uint nextNodeId = lightLinkNode | 0xFF000000;
+        if (nextNodeId != 0xFFFFFFFF)
+            nextNode = lightLinkNode & 0xFFFFFF;
+        else
+            nextNode = 0xFFFFFFFF;
+
+        uint lightId = lightLinkNode >> 24;
+
+        LightRenderingData lightRenderingData = AllLightsRenderingData[lightId];
+        LightGeoData lightData = AllLightList[lightId];
+
+		if (lightRenderingData.AffectVolumetricLight == 0)
+			continue;
+
+        float3 vPosition2LightRayWs = lightData.PositionSizeSqr.xyz - worldPos;
+        float wsPos2LightSq = dot(vPosition2LightRayWs.xyz, vPosition2LightRayWs.xyz);
+
+        float lightAtten = 1.0;
+
+        int lightType = 2; //Spot Light;
+        if (lightData.PositionSizeSqr.w < 0)
+            lightType = 0; //Directional Light
+        else if (lightData.ForwardCosAngle.w < 0)
+            lightType = 1; //Point Light
+
+        if (lightRenderingData.ShadowIndex >= 0)
+        {
+            int shadowIndexOffset = 0;
+
+            ShadowData sd = _ShadowDatasExp[lightRenderingData.ShadowIndex + shadowIndexOffset];
+
+            lightAtten = ComputeShadow_Exponential(worldPos, sd, true);
+        }
+
+        if (lightData.PositionSizeSqr.w > 0 && (wsPos2LightSq > lightData.PositionSizeSqr.w))
+            continue;
+
+        float3 vPositionToLightDirWs = lightData.PositionSizeSqr.w > 0 ? normalize(vPosition2LightRayWs.xyz) : -lightData.ForwardCosAngle.xyz;
+        float flTemp = min(dot(-vPositionToLightDirWs.xyz, lightData.ForwardCosAngle.xyz) - lightData.ForwardCosAngle.w, 1.0);
+
+        if (flTemp <= 0.0 && lightData.PositionSizeSqr.w > 0)
+            continue;
+
+        float fallOffParam = lightData.PositionSizeSqr.w > 0 ? (1.0 - pow(wsPos2LightSq / lightData.PositionSizeSqr.w, 0.175)) : 1.0;
+        float spotLightAtten = saturate(flTemp * lightRenderingData.Color.w);
+
+        float cookieAtten = 1.0;
+        float cosTheta = dot(viewDir, -vPositionToLightDirWs.xyz);
+        float phg = (1 - k * k) / (pow(1 - cosTheta * k, 2));
+
+        float atten = spotLightAtten * fallOffParam * lightAtten * cookieAtten * phg;
+
+        colorDensity.rgb += lightRenderingData.Color.xyz * atten;
+    }
+
+    half4 albedoExtinction = VolumetricLightingTexture[uint3(globalIdx.x, globalIdx.y, globalIdx.z)];
+    albedoExtinction.rgb = colorDensity.rgb * albedoExtinction.xyz + ambientColor * albedoExtinction.a;
+    VolumetricLightingTexture[uint3(globalIdx.x, globalIdx.y, globalIdx.z)] = albedoExtinction;
+}
+
+#pragma kernel VolumetricLightingWhole
+
+[numthreads(4, 4, 16)]
+void VolumetricLightingWhole(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+    uint localIndex = localIdx.y * 4 + localIdx.x;
+
+    if (localIdx.z == 0)
+    {
+        ldsFarWsArray[localIndex] = ClusterID2FarPos(half3(globalIdx.x, globalIdx.y, globalIdx.z) + HaltonSequence, FogClusterParams);
+        ldsFarCenterWsArray[localIndex] = ClusterID2FarPos(half3(globalIdx.x, globalIdx.y, globalIdx.x) + 0.5, FogClusterParams);
+        ldsLastIndexArray[localIndex] = (floor(globalIdx.x * CullingClusterParams.x / FogClusterParams.x) * CullingClusterParams.y + floor(globalIdx.y * CullingClusterParams.y / FogClusterParams.y)) * CullingClusterParams.z * 4;
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    //float4 farPos = float4(asfloat(ldsPosWs.x), asfloat(ldsPosWs.y), asfloat(ldsPosWs.z), 1.0);
+    //float nearDepth = ClusterDepthSlicesBuffer[clusterId.z];
+    //float farDepth = ClusterDepthSlicesBuffer[localIdx.x + 1];//To do
+    //float nearDepth = ClusterDepthSlicesBuffer[localIdx.x];//To do
+    float farDepth = ClusterDepthSlicesArray[globalIdx.z + 1].x;//To do
+    float nearDepth = ClusterDepthSlicesArray[globalIdx.z].x;//To do	
+    float actualDepth = nearDepth + (farDepth - nearDepth) * HaltonSequence.z; //(farDepth + nearDepth) / 2;//
+    float3 worldPos = CameraPos + (ldsFarWsArray[localIndex] - CameraPos) * actualDepth;
+    float3 centerWorldPos = CameraPos + (ldsFarCenterWsArray[localIndex] - CameraPos) * (nearDepth + farDepth) / 2;
+    float3 viewDir = normalize(CameraPos - worldPos);
+
+    float k = 0.0f;
+    half4 colorDensity = 0;
+    for (int idx = 0; idx < _DirectionalLightCount; idx++)
+    {
+        DirectionalLightDataSimple dirLight = _DirectionalLightsDataSimpleBuffer[idx];
+        float3 vPositionToLightDirWs = -dirLight.ForwardCosAngle.xyz;
+
+        float lightAtten = 1.0;
+
+        lightAtten = Compute_Direction_Light_Shadow(worldPos, dirLight);
+        float cosTheta = dot(viewDir, -vPositionToLightDirWs);
+        float phg = (1 - k * k) / (pow(1 - cosTheta * k, 2));
+
+        half3 dirLightColor = dirLight.Color.xyz * lightAtten * phg;
+
+        colorDensity.rgb += dirLightColor;
+    }
+
+    float3 lastFrameClusterUV = PosWorldToClusterUV(float4(centerWorldPos, 1.0f), Cluster_Matrix_LinearZ_LastFrame);
+    half4 lastFrameColor = VolumetricLightingTextureLastFrame.SampleLevel(samplerVolumetricLightingTextureLastFrame, lastFrameClusterUV, 0);
+
+    int loopCount = 0;
+
+    uint startOffsetAddress = ldsLastIndexArray[localIndex] + globalIdx.z * 4;
+    uint nextNode = ClusterStartOffsetIndexIn.Load(startOffsetAddress);
+
+    [loop] while (nextNode != 0xFFFFFFFF && loopCount < MAX_NUM_LIGHTS_PER_TILE)
+    {
+        loopCount++;
+
+        uint lightLinkNode = ClusterLightsLinkListIn[nextNode];
+        uint nextNodeId = lightLinkNode | 0xFF000000;
+        if (nextNodeId != 0xFFFFFFFF)
+            nextNode = lightLinkNode & 0xFFFFFF;
+        else
+            nextNode = 0xFFFFFFFF;
+
+        uint lightId = lightLinkNode >> 24;
+
+        LightRenderingData lightRenderingData = AllLightsRenderingData[lightId];
+        LightGeoData lightData = AllLightList[lightId];
+
+		if (lightRenderingData.AffectVolumetricLight == 0)
+			continue;
+
+        float3 vPosition2LightRayWs = lightData.PositionSizeSqr.xyz - worldPos;
+        float wsPos2LightSq = dot(vPosition2LightRayWs.xyz, vPosition2LightRayWs.xyz);
+
+        float lightAtten = 1.0;
+
+        int lightType = 2; //Spot Light;
+        if (lightData.PositionSizeSqr.w < 0)
+            lightType = 0; //Directional Light
+        else if (lightData.ForwardCosAngle.w < 0)
+            lightType = 1; //Point Light
+
+		lightAtten = Compute_Light_Attenuation(worldPos, lightRenderingData.ShadowIndex, lightRenderingData.CookieIndex, true);
+
+        if (lightData.PositionSizeSqr.w > 0 && (wsPos2LightSq > lightData.PositionSizeSqr.w))
+            continue;
+
+        float3 vPositionToLightDirWs = lightData.PositionSizeSqr.w > 0 ? normalize(vPosition2LightRayWs.xyz) : -lightData.ForwardCosAngle.xyz;
+        float flTemp = min(dot(-vPositionToLightDirWs.xyz, lightData.ForwardCosAngle.xyz) - lightData.ForwardCosAngle.w, 1.0);
+
+        if (flTemp <= 0.0 && lightData.PositionSizeSqr.w > 0)
+            continue;
+
+        float fallOffParam = lightData.PositionSizeSqr.w > 0 ? (1.0 - pow(wsPos2LightSq / lightData.PositionSizeSqr.w, 0.175)) : 1.0;
+        float spotLightAtten = saturate(flTemp * lightRenderingData.Color.w);
+
+        float cosTheta = dot(viewDir, -vPositionToLightDirWs.xyz);
+        float phg = (1 - k * k) / (pow(1 - cosTheta * k, 2));
+
+        float atten = spotLightAtten * fallOffParam * lightAtten * phg;
+
+        colorDensity.rgb += lightRenderingData.Color.xyz * atten;
+    }
+
+    half p = (GlobalFogParams.x - worldPos.y) / (GlobalFogParams.x - GlobalFogParams.y);
+    int pos = clamp(floor(p * 255.0), 0, 255);
+    half fraction = p * 255.0 - pos;
+    float4 fogMedia = (pos == 0 || pos == 255) ? FogMediaGradient[pos] : FogMediaGradient[pos] * (1 - fraction) + FogMediaGradient[pos + 1] * fraction;//SAMPLE_TEX2D_LOD(GlobalFogMediaTexture, float2(p, 0), 0);
+
+    float f = 0.0;
+    float3 q = (worldPos) / 10.0f + velocityPhg.xyz;
+    f = 0.5000*noise(q); q = q * 2.01;
+    f += 0.2500*noise(q); q = q * 2.02;
+
+    f *= f;
+
+    half extinction = GlobalFogParams.z * fogMedia.w * f;
+    colorDensity.a = extinction;
+    half3 albedo = (fogMedia.xyz) * extinction / 12.56;
+
+    colorDensity.rgb = colorDensity.rgb * albedo * GlobalFogParams.w + ambientColor * extinction;
+
+    half actualBlendWeight = 0.0;
+
+    if (all(lastFrameClusterUV >= 0) && all(lastFrameClusterUV < 1))
+        actualBlendWeight = 0.95;
+
+    VolumetricLightingTexture[uint3(globalIdx.x, globalIdx.y, globalIdx.z)] = (colorDensity * (1 - actualBlendWeight) + lastFrameColor * actualBlendWeight);
+}
+
+//groupshared float3 ldsFarWsArray[16];
+//groupshared float3 ldsFarCenterWsArray[16];
+//groupshared int ldsLastIndexArray[16];
+
+#pragma kernel VolumetricReprojection
+
+[numthreads(4, 4, 16)]
+void VolumetricReprojection(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+	uint localIndex = localIdx.y * 4 + localIdx.x;
+
+	if (localIdx.z == 0)
+	{
+		ldsFarCenterWsArray[localIndex] = ClusterID2FarPos(half3(globalIdx.x, globalIdx.y, globalIdx.x) + 0.5, FogClusterParams);
+	}
+
+	GroupMemoryBarrierWithGroupSync();
+
+	//float4 farPos = float4(asfloat(ldsPosWs.x), asfloat(ldsPosWs.y), asfloat(ldsPosWs.z), 1.0);
+	//float nearDepth = ClusterDepthSlicesBuffer[clusterId.z];
+	//float farDepth = ClusterDepthSlicesBuffer[localIdx.x + 1];//To do
+	//float nearDepth = ClusterDepthSlicesBuffer[localIdx.x];//To do
+	float farDepth = ClusterDepthSlicesArray[globalIdx.z + 1].x;//To do
+	float nearDepth = ClusterDepthSlicesArray[globalIdx.z].x;//To do	
+	float3 centerWorldPos = CameraPos + (ldsFarCenterWsArray[localIndex] - CameraPos) * (nearDepth + farDepth) / 2;
+
+    half4 colorDensity = 0;
+
+	float3 lastFrameClusterUV = PosWorldToClusterUV(float4(centerWorldPos, 1.0f), Cluster_Matrix_LinearZ_LastFrame);
+	half4 lastFrameColor = VolumetricLightingTextureLastFrame.SampleLevel(samplerVolumetricLightingTextureLastFrame, lastFrameClusterUV, 0);
+    	
+	colorDensity = VolumetricLightingTexture[uint3(globalIdx.x, globalIdx.y, globalIdx.z)];
+
+	if (AnyIsNan(lastFrameColor))
+	{
+		lastFrameColor = (0.0).xxxx;
+	}
+
+	half actualBlendWeight = 0.0;
+
+	if (all(lastFrameClusterUV >= 0) && all(lastFrameClusterUV < 1))
+		actualBlendWeight = 0.95;
+
+	VolumetricLightingTexture[uint3(globalIdx.x, globalIdx.y, globalIdx.z)] = (colorDensity * (1 - actualBlendWeight) + lastFrameColor * actualBlendWeight);
+}

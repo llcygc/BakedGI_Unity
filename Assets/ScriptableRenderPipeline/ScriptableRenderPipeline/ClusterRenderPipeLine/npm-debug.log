@@ -1,0 +1,205 @@
+0 info it worked if it ends with ok
+1 verbose cli [ 'C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\Web\\External\\Node.exe',
+1 verbose cli   'C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\Web\\External\\node_modules\\npm\\bin\\npm-cli.js',
+1 verbose cli   'install' ]
+2 info using npm@3.3.4
+3 info using node@v5.4.1
+4 silly loadCurrentTree Starting
+5 silly install loadCurrentTree
+6 silly install readLocalPackageData
+7 silly install normalizeTree
+8 silly loadCurrentTree Finishing
+9 silly loadIdealTree Starting
+10 silly install loadIdealTree
+11 silly cloneCurrentTree Starting
+12 silly install cloneCurrentTreeToIdealTree
+13 silly cloneCurrentTree Finishing
+14 silly loadShrinkwrap Starting
+15 silly install loadShrinkwrap
+16 silly loadShrinkwrap Finishing
+17 silly loadAllDepsIntoIdealTree Starting
+18 silly install loadAllDepsIntoIdealTree
+19 silly fetchNamedPackageData com.unity.postprocessing
+20 silly mapToRegistry name com.unity.postprocessing
+21 silly mapToRegistry using default registry
+22 silly mapToRegistry registry https://registry.npmjs.org/
+23 silly mapToRegistry uri https://registry.npmjs.org/com.unity.postprocessing
+24 silly fetchNamedPackageData com.unity.render-pipelines.core
+25 silly mapToRegistry name com.unity.render-pipelines.core
+26 silly mapToRegistry using default registry
+27 silly mapToRegistry registry https://registry.npmjs.org/
+28 silly mapToRegistry uri https://registry.npmjs.org/com.unity.render-pipelines.core
+29 silly fetchNamedPackageData com.unity.render-pipelines.render-graph
+30 silly mapToRegistry name com.unity.render-pipelines.render-graph
+31 silly mapToRegistry using default registry
+32 silly mapToRegistry registry https://registry.npmjs.org/
+33 silly mapToRegistry uri https://registry.npmjs.org/com.unity.render-pipelines.render-graph
+34 verbose request uri https://registry.npmjs.org/com.unity.postprocessing
+35 verbose request no auth needed
+36 info attempt registry request try #1 at 21:17:50
+37 verbose request id 0e3f552fc9e31b90
+38 http request GET https://registry.npmjs.org/com.unity.postprocessing
+39 verbose request uri https://registry.npmjs.org/com.unity.render-pipelines.core
+40 verbose request no auth needed
+41 info attempt registry request try #1 at 21:17:50
+42 http request GET https://registry.npmjs.org/com.unity.render-pipelines.core
+43 verbose request uri https://registry.npmjs.org/com.unity.render-pipelines.render-graph
+44 verbose request no auth needed
+45 info attempt registry request try #1 at 21:17:50
+46 http request GET https://registry.npmjs.org/com.unity.render-pipelines.render-graph
+47 http 404 https://registry.npmjs.org/com.unity.render-pipelines.render-graph
+48 verbose headers { 'content-type': 'application/json',
+48 verbose headers   'cache-control': 'max-age=0',
+48 verbose headers   'content-length': '2',
+48 verbose headers   'accept-ranges': 'bytes',
+48 verbose headers   date: 'Tue, 20 Mar 2018 13:17:52 GMT',
+48 verbose headers   via: '1.1 varnish',
+48 verbose headers   connection: 'keep-alive',
+48 verbose headers   'x-served-by': 'cache-nrt6147-NRT',
+48 verbose headers   'x-cache': 'MISS',
+48 verbose headers   'x-cache-hits': '0',
+48 verbose headers   'x-timer': 'S1521551871.052765,VS0,VE1109',
+48 verbose headers   vary: 'Accept-Encoding' }
+49 silly get cb [ 404,
+49 silly get   { 'content-type': 'application/json',
+49 silly get     'cache-control': 'max-age=0',
+49 silly get     'content-length': '2',
+49 silly get     'accept-ranges': 'bytes',
+49 silly get     date: 'Tue, 20 Mar 2018 13:17:52 GMT',
+49 silly get     via: '1.1 varnish',
+49 silly get     connection: 'keep-alive',
+49 silly get     'x-served-by': 'cache-nrt6147-NRT',
+49 silly get     'x-cache': 'MISS',
+49 silly get     'x-cache-hits': '0',
+49 silly get     'x-timer': 'S1521551871.052765,VS0,VE1109',
+49 silly get     vary: 'Accept-Encoding' } ]
+50 silly fetchPackageMetaData Error: Registry returned 404 for GET on https://registry.npmjs.org/com.unity.render-pipelines.render-graph
+50 silly fetchPackageMetaData     at makeError (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\npm-registry-client\lib\request.js:264:12)
+50 silly fetchPackageMetaData     at CachingRegistryClient.<anonymous> (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\npm-registry-client\lib\request.js:242:14)
+50 silly fetchPackageMetaData     at Request._callback (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\npm-registry-client\lib\request.js:172:14)
+50 silly fetchPackageMetaData     at Request.self.callback (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\request\request.js:344:22)
+50 silly fetchPackageMetaData     at emitTwo (events.js:87:13)
+50 silly fetchPackageMetaData     at Request.emit (events.js:172:7)
+50 silly fetchPackageMetaData     at Request.<anonymous> (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\request\request.js:1239:14)
+50 silly fetchPackageMetaData     at emitOne (events.js:82:20)
+50 silly fetchPackageMetaData     at Request.emit (events.js:169:7)
+50 silly fetchPackageMetaData     at IncomingMessage.<anonymous> (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\request\request.js:1187:12)
+50 silly fetchPackageMetaData  error for com.unity.render-pipelines.render-graph@0.0.1-alpha { [Error: Registry returned 404 for GET on https://registry.npmjs.org/com.unity.render-pipelines.render-graph]
+50 silly fetchPackageMetaData   pkgid: 'com.unity.render-pipelines.render-graph',
+50 silly fetchPackageMetaData   statusCode: 404,
+50 silly fetchPackageMetaData   code: 'E404' }
+51 http 404 https://registry.npmjs.org/com.unity.postprocessing
+52 verbose headers { 'content-type': 'application/json',
+52 verbose headers   'cache-control': 'max-age=0',
+52 verbose headers   'content-length': '2',
+52 verbose headers   'accept-ranges': 'bytes',
+52 verbose headers   date: 'Tue, 20 Mar 2018 13:17:52 GMT',
+52 verbose headers   via: '1.1 varnish',
+52 verbose headers   connection: 'keep-alive',
+52 verbose headers   'x-served-by': 'cache-nrt6140-NRT',
+52 verbose headers   'x-cache': 'MISS',
+52 verbose headers   'x-cache-hits': '0',
+52 verbose headers   'x-timer': 'S1521551871.049980,VS0,VE1159',
+52 verbose headers   vary: 'Accept-Encoding' }
+53 silly get cb [ 404,
+53 silly get   { 'content-type': 'application/json',
+53 silly get     'cache-control': 'max-age=0',
+53 silly get     'content-length': '2',
+53 silly get     'accept-ranges': 'bytes',
+53 silly get     date: 'Tue, 20 Mar 2018 13:17:52 GMT',
+53 silly get     via: '1.1 varnish',
+53 silly get     connection: 'keep-alive',
+53 silly get     'x-served-by': 'cache-nrt6140-NRT',
+53 silly get     'x-cache': 'MISS',
+53 silly get     'x-cache-hits': '0',
+53 silly get     'x-timer': 'S1521551871.049980,VS0,VE1159',
+53 silly get     vary: 'Accept-Encoding' } ]
+54 silly fetchPackageMetaData Error: Registry returned 404 for GET on https://registry.npmjs.org/com.unity.postprocessing
+54 silly fetchPackageMetaData     at makeError (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\npm-registry-client\lib\request.js:264:12)
+54 silly fetchPackageMetaData     at CachingRegistryClient.<anonymous> (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\npm-registry-client\lib\request.js:242:14)
+54 silly fetchPackageMetaData     at Request._callback (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\npm-registry-client\lib\request.js:172:14)
+54 silly fetchPackageMetaData     at Request.self.callback (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\request\request.js:344:22)
+54 silly fetchPackageMetaData     at emitTwo (events.js:87:13)
+54 silly fetchPackageMetaData     at Request.emit (events.js:172:7)
+54 silly fetchPackageMetaData     at Request.<anonymous> (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\request\request.js:1239:14)
+54 silly fetchPackageMetaData     at emitOne (events.js:82:20)
+54 silly fetchPackageMetaData     at Request.emit (events.js:169:7)
+54 silly fetchPackageMetaData     at IncomingMessage.<anonymous> (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\request\request.js:1187:12)
+54 silly fetchPackageMetaData  error for com.unity.postprocessing@2.0.0-beta { [Error: Registry returned 404 for GET on https://registry.npmjs.org/com.unity.postprocessing]
+54 silly fetchPackageMetaData   pkgid: 'com.unity.postprocessing',
+54 silly fetchPackageMetaData   statusCode: 404,
+54 silly fetchPackageMetaData   code: 'E404' }
+55 http 404 https://registry.npmjs.org/com.unity.render-pipelines.core
+56 verbose headers { 'content-type': 'application/json',
+56 verbose headers   'cache-control': 'max-age=0',
+56 verbose headers   'content-length': '2',
+56 verbose headers   'accept-ranges': 'bytes',
+56 verbose headers   date: 'Tue, 20 Mar 2018 13:17:52 GMT',
+56 verbose headers   via: '1.1 varnish',
+56 verbose headers   connection: 'keep-alive',
+56 verbose headers   'x-served-by': 'cache-nrt6149-NRT',
+56 verbose headers   'x-cache': 'MISS',
+56 verbose headers   'x-cache-hits': '0',
+56 verbose headers   'x-timer': 'S1521551871.051014,VS0,VE1172',
+56 verbose headers   vary: 'Accept-Encoding' }
+57 silly get cb [ 404,
+57 silly get   { 'content-type': 'application/json',
+57 silly get     'cache-control': 'max-age=0',
+57 silly get     'content-length': '2',
+57 silly get     'accept-ranges': 'bytes',
+57 silly get     date: 'Tue, 20 Mar 2018 13:17:52 GMT',
+57 silly get     via: '1.1 varnish',
+57 silly get     connection: 'keep-alive',
+57 silly get     'x-served-by': 'cache-nrt6149-NRT',
+57 silly get     'x-cache': 'MISS',
+57 silly get     'x-cache-hits': '0',
+57 silly get     'x-timer': 'S1521551871.051014,VS0,VE1172',
+57 silly get     vary: 'Accept-Encoding' } ]
+58 silly fetchPackageMetaData Error: Registry returned 404 for GET on https://registry.npmjs.org/com.unity.render-pipelines.core
+58 silly fetchPackageMetaData     at makeError (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\npm-registry-client\lib\request.js:264:12)
+58 silly fetchPackageMetaData     at CachingRegistryClient.<anonymous> (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\npm-registry-client\lib\request.js:242:14)
+58 silly fetchPackageMetaData     at Request._callback (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\npm-registry-client\lib\request.js:172:14)
+58 silly fetchPackageMetaData     at Request.self.callback (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\request\request.js:344:22)
+58 silly fetchPackageMetaData     at emitTwo (events.js:87:13)
+58 silly fetchPackageMetaData     at Request.emit (events.js:172:7)
+58 silly fetchPackageMetaData     at Request.<anonymous> (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\request\request.js:1239:14)
+58 silly fetchPackageMetaData     at emitOne (events.js:82:20)
+58 silly fetchPackageMetaData     at Request.emit (events.js:169:7)
+58 silly fetchPackageMetaData     at IncomingMessage.<anonymous> (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\request\request.js:1187:12)
+58 silly fetchPackageMetaData  error for com.unity.render-pipelines.core@0.1.33 { [Error: Registry returned 404 for GET on https://registry.npmjs.org/com.unity.render-pipelines.core]
+58 silly fetchPackageMetaData   pkgid: 'com.unity.render-pipelines.core',
+58 silly fetchPackageMetaData   statusCode: 404,
+58 silly fetchPackageMetaData   code: 'E404' }
+59 silly rollbackFailedOptional Starting
+60 silly rollbackFailedOptional Finishing
+61 silly runTopLevelLifecycles Starting
+62 silly runTopLevelLifecycles Finishing
+63 silly install printInstalled
+64 verbose stack Error: Registry returned 404 for GET on https://registry.npmjs.org/com.unity.render-pipelines.render-graph
+64 verbose stack     at makeError (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\npm-registry-client\lib\request.js:264:12)
+64 verbose stack     at CachingRegistryClient.<anonymous> (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\npm-registry-client\lib\request.js:242:14)
+64 verbose stack     at Request._callback (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\npm-registry-client\lib\request.js:172:14)
+64 verbose stack     at Request.self.callback (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\request\request.js:344:22)
+64 verbose stack     at emitTwo (events.js:87:13)
+64 verbose stack     at Request.emit (events.js:172:7)
+64 verbose stack     at Request.<anonymous> (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\request\request.js:1239:14)
+64 verbose stack     at emitOne (events.js:82:20)
+64 verbose stack     at Request.emit (events.js:169:7)
+64 verbose stack     at IncomingMessage.<anonymous> (C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Web\External\node_modules\request\request.js:1187:12)
+65 verbose statusCode 404
+66 verbose pkgid com.unity.render-pipelines.render-graph
+67 verbose cwd E:\Project\SPRTEST_Code\Assets\ScriptableRenderPipeline\ScriptableRenderPipeline\ClusterRenderPipeLine
+68 error Windows_NT 10.0.16299
+69 error argv "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\Web\\External\\Node.exe" "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\Web\\External\\node_modules\\npm\\bin\\npm-cli.js" "install"
+70 error node v5.4.1
+71 error npm  v3.3.4
+72 error code E404
+73 error 404 Registry returned 404 for GET on https://registry.npmjs.org/com.unity.render-pipelines.render-graph
+73 error 404
+73 error 404 'com.unity.render-pipelines.render-graph' is not in the npm registry.
+73 error 404 You should bug the author to publish it (or use the name yourself!)
+73 error 404 It was specified as a dependency of 'com.unity.render-pipelines.cluster-pipeline'
+73 error 404
+73 error 404 Note that you can also install from a
+73 error 404 tarball, folder, http url, or git url.
+74 verbose exit [ 1, true ]

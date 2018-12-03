@@ -1,0 +1,61 @@
+//#include "PostProcessVariables.hlsl"
+//#include "../Lit/Lighting/ClusterUtils.cginc"
+//#include "../ShadowUtils.cginc"
+//
+////-------Should move to another hlsl-----------------------//
+//float4 GetWorldPosFromThreadID(uint3 id, float depth, float4x4 InvVPMatrix)
+//{
+//    float4 clipPos = float4((float)id.x / ClusterScreenParams.x, 1 - (float)id.y / ClusterScreenParams.y, depth, 1.0f);
+//
+//    clipPos.xy = clipPos.xy * 2 - 1;
+//
+//    float4 WorldPos = mul(InvVPMatrix, clipPos);
+//
+//    return WorldPos / WorldPos.w;
+//}
+//
+//// Each #kernel tells which function to compile; you can have many kernels
+//#pragma kernel ScreenSpaceShadow
+//
+//// Create a RenderTexture with enableRandomWrite flag and set it
+//// with cs.SetTexture
+//RW_TEXTURE2D(half, _ScreenSpaceShadowBuffer);
+//TEXTURE2D(MainDepthBuffer);
+//TEXTURE2D(_R8Buffer);
+//
+//[numthreads(8,8,1)]
+//void ScreenSpaceShadow(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+//{
+//	// TODO: insert actual code here!
+//    float srcDepth = LOAD_TEXTURE2D(MainDepthBuffer, globalIdx.xy).x;
+//    float4 worldPos = GetWorldPosFromThreadID(globalIdx, srcDepth, _InvViewProjMatrix);
+//
+//    DirectionalLightDataSimple dirLight = _DirectionalLightsDataSimpleBuffer[0];
+//
+//    _ScreenSpaceShadowBuffer[globalIdx.xy] = Compute_Direction_Light_Shadow(worldPos, dirLight);
+//}
+//
+//// Each #kernel tells which function to compile; you can have many kernels
+//#pragma kernel ScreenSpaceShadowStereo
+//
+//// Create a RenderTexture with enableRandomWrite flag and set it
+//// with cs.SetTexture
+//RW_TEXTURE2D_ARRAY(half, _ScreenSpaceShadowBufferArray);
+//TEXTURE2D_ARRAY(MainDepthBufferStereo);
+//float4x4 _InvViewProjMatrixStereo[2];
+//
+//[numthreads(8, 8, 1)]
+//void ScreenSpaceShadowStereo(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+//{
+//    half mask = LOAD_TEXTURE2D(_R8Buffer, globalIdx.xy).x;
+//    if (mask == 1.0)
+//    {
+//        // TODO: insert actual code here!
+//        float srcDepth = LOAD_TEXTURE2D_ARRAY(MainDepthBufferStereo, globalIdx.xy, globalIdx.z).x;
+//        float4 worldPos = GetWorldPosFromThreadID(globalIdx, srcDepth, _InvViewProjMatrixStereo[globalIdx.z]);
+//
+//        DirectionalLightDataSimple dirLight = _DirectionalLightsDataSimpleBuffer[0];
+//
+//        _ScreenSpaceShadowBufferArray[globalIdx.xyz] = Compute_Direction_Light_Shadow(worldPos, dirLight);
+//    }
+//}

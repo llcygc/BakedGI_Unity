@@ -1,0 +1,7 @@
+﻿{
+    "name": "com.unity.render-pipelines.cluster-pipeline",
+    "description": "Cluster Render Pipeline for Unity.",
+    "subDependencies": [
+        "com.unity.render-pipelines.core"
+    ]
+}

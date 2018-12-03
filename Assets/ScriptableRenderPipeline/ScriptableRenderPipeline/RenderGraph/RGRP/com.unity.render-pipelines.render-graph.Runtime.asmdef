@@ -1,0 +1,11 @@
+﻿{
+    "name": "com.unity.render-pipelines.render-graph.Runtime",
+    "references": [
+        "com.unity.render-pipelines.core.Runtime",
+        "com.unity.postprocessing.Runtime"
+    ],
+    "optionalUnityReferences": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true
+}

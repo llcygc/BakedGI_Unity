@@ -1,0 +1,12 @@
+{
+    "name": "com.viva.render-pipelines.cluster-pipeline.Runtime",
+    "references": [
+        "com.unity.render-pipelines.core.Runtime",
+        "com.unity.postprocessing.Runtime",
+        "com.unity.render-pipelines.render-graph.Runtime"
+    ],
+    "optionalUnityReferences": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true
+}

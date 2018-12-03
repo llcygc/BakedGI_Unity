@@ -1,0 +1,106 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#include "CoreRP/ShaderLibrary/Common.hlsl"
+#include "Lit/Lighting/ClusterData.cginc"
+
+bool OverLaps(float4 centerRadius, LightGeoData data)
+{
+	if (data.PositionSizeSqr.w == 0)
+		return false;
+	else if (data.PositionSizeSqr.w < 0)
+		return true;
+	else if (data.ForwardCosAngle.w < 0)
+	{
+		return length(data.PositionSizeSqr.xyz - centerRadius.xyz) < (centerRadius.w + sqrt(data.PositionSizeSqr.w));
+	}
+	else
+	{
+		float cosAngle = data.ForwardCosAngle.w;
+		float sinAngle = sqrt(1 - cosAngle * cosAngle);
+		const float3 newPos = data.PositionSizeSqr.xyz - data.ForwardCosAngle.xyz * centerRadius.w / sinAngle;
+		const float newSize = sqrt(data.PositionSizeSqr.w) + centerRadius.w / sinAngle + centerRadius.w;
+		float3 distanceVec = centerRadius.xyz - newPos;
+		float distance = length(distanceVec);
+
+		return (dot(distanceVec / distance, data.ForwardCosAngle.xyz) >= cosAngle) && (distance <= newSize);
+	}
+
+	return false;
+}
+
+inline float4 ComputeCameraPos(uint xPos, uint yPos)
+{
+	float2 screenPos = (float2(xPos, yPos) / ClusterScreenParams.xy) * 2 - 1;
+	float4 clipPos = float4(screenPos.x, -screenPos.y, 0.0, 1.0);
+	float4 cameraPos = mul(matrix_MVPInv, clipPos);
+	return cameraPos / cameraPos.w;
+}
+
+inline float CluserDepthToViewDepth(uint clusterIdZ)
+{
+	//return ClusterDepthSlicesBuffer[clusterIdZ];
+	return ClusterDepthSlicesArray[clusterIdZ].x;
+}
+
+groupshared float4 ldsClusterPos[4];
+groupshared float4 clusterPosUpRight;
+groupshared float4 clusterPosDownLeft;
+groupshared float4 clusterPosDownRight;
+
+#pragma kernel LightAssignment
+
+[numthreads(CLUSTER_SLICES, 1, 1)]
+void LightAssignment(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+	// TODO: insert actual code here!
+	//Build frustum
+	//uint localIdFlattened = localIdx.z + NUM_THREADS_X * localIdx.y;
+
+	//uint startOffsetAddress = (localIdx.x + groupIdx.y * CullingClusterParams.z) + CullingClusterParams.z * CullingClusterParams.y * groupIdx.x;
+	uint startOffsetAddress = (localIdx.x + groupIdx.y * CullingClusterParams.z) * 4 + CullingClusterParams.z * CullingClusterParams.y * groupIdx.x * 4;
+
+	//Calculate Z extent
+	if (localIdx.x == 0)
+	{
+		/*cameraPosUpLeft*/ ldsClusterPos[0] = ComputeCameraPos(groupIdx.x * CLUSTER_RES, groupIdx.y * CLUSTER_RES);
+		/*cameraPosUpRight*/ ldsClusterPos[1] = ComputeCameraPos(groupIdx.x * CLUSTER_RES + CLUSTER_RES, groupIdx.y * CLUSTER_RES);
+		/*cameraPosDownLeft*/ ldsClusterPos[2] = ComputeCameraPos(groupIdx.x * CLUSTER_RES, groupIdx.y * CLUSTER_RES + CLUSTER_RES);
+		/*cameraPosDownRight*/ ldsClusterPos[3] = ComputeCameraPos(groupIdx.x * CLUSTER_RES + CLUSTER_RES, groupIdx.y * CLUSTER_RES + CLUSTER_RES);
+	}
+
+	GroupMemoryBarrierWithGroupSync();
+
+	uint temp = 0;
+	ClusterStartOffsetIndex.InterlockedExchange(startOffsetAddress, 0xffffffff, temp);
+
+	float zMin = CluserDepthToViewDepth(localIdx.x);
+	float zMax = CluserDepthToViewDepth(localIdx.x + 1);
+
+	float4 centerRadius = 0;
+
+	[loop]for (int i = 0; i < 4; i++)
+	{
+		float4 nearPoint = CameraPos + (ldsClusterPos[i] - CameraPos) * (zMin);
+		float4 farPoint = CameraPos + (ldsClusterPos[3 - i] - CameraPos) * (zMax);
+		float distance = length(nearPoint.xyz - farPoint.xyz) / 2.0f;
+
+		if (distance > centerRadius.w)
+		{
+			centerRadius.xyz = (nearPoint.xyz + farPoint.xyz) / 2;
+			centerRadius.w = distance ;
+		}
+	}
+
+	[loop]for(uint j = 0; j < _PunctualLightCount; j++)
+	{
+		if (OverLaps(centerRadius, AllLightList[j]))
+		{
+			uint indexCount = ClusterLightsLinkList.IncrementCounter();
+
+			uint prev_offset;
+			ClusterStartOffsetIndex.InterlockedExchange(startOffsetAddress, indexCount, prev_offset);
+
+			uint lightLinkNode = (j << 24) | (prev_offset & 0xFFFFFF);
+			ClusterLightsLinkList[indexCount] = lightLinkNode;
+		}
+	}
+}

@@ -1,0 +1,123 @@
+#include "PostProcessVariables.hlsl"
+#include "../Lit/Lighting/ClusterUtils.cginc"
+
+
+//-------Should move to another hlsl-----------------------//
+float4 GetWorldPosFromThreadID(uint3 id, float depth, float4x4 InvVPMatrix)
+{
+    float4 clipPos = float4((float)id.x / _ScreenParams.x, 1 - (float)id.y / _ScreenParams.y, depth, 1.0f);
+
+    clipPos.xy = clipPos.xy * 2 - 1;
+
+    float4 WorldPos = mul(InvVPMatrix, clipPos);
+
+    return WorldPos / WorldPos.w;
+}
+
+//-------Should move to another hlsl-----------------------//
+float4 GetWorldPosFromThreadID_OP(uint3 id, float depth, float3 camPos)
+{
+	float linearDepth = 1.0 / (_ZBufferParams.x * depth + _ZBufferParams.y);//Linear01Depth @ Common.hlsl
+
+	float4 clipPos = float4((float)id.x / _ScreenParams.x, (float)id.y / _ScreenParams.y, depth, 1.0f);
+
+	float3 farPos = mad(clipPos.yyy, CameraUpDirLength.xyz, CameraBottomLeft[0].xyz);
+	farPos = mad(clipPos.xxx, CameraRightDirLength.xyz, farPos);
+
+	float3 worldPos = mad(linearDepth, farPos - CameraPos.xyz, CameraPos.xyz);
+
+	//return float4(worldPos.xyz, 1.0f);
+	return float4(farPos, linearDepth);
+}
+
+//-------Should move to another hlsl-----------------------//
+float3 GetClusterUVFromPosWS_OP(float4 worldPos)
+{
+	float3 clusterUV = 0;
+	float3 distVector = worldPos.xyz - CameraPos.xyz;
+	clusterUV.y = dot(ClusterUpDirLength.xyz, distVector) / ClusterUpDirLength.w;
+	clusterUV.x = -dot(ClusterRightDirLength.xyz, distVector) / ClusterRightDirLength.w;
+
+	clusterUV.xy += 0.5f;// (clusterUV.xy + 1.0f) / 2.0f;
+
+	float fn = ClusterProjParams.y / ClusterProjParams.x;
+	clusterUV.z = (log(worldPos.w * fn) / log(fn));
+
+	return clusterUV;
+}
+
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel FogandAO
+
+RW_TEXTURE2D(half4, MainColorBuffer);
+TEXTURE2D(MainDepthBuffer);
+TEXTURE2D(SSAOBuffer);
+TEXTURE2D(_R8Buffer);
+
+[numthreads(8,8,1)]
+void FogandAO (uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+        half4 srcColor = MainColorBuffer[globalIdx.xy];
+
+        float srcDepth = LOAD_TEXTURE2D(MainDepthBuffer, globalIdx.xy).x;
+        float4 worldPos = GetWorldPosFromThreadID(globalIdx, srcDepth, _InvViewProjMatrix);
+        half3 clusterUV = PosWorldToClusterUV(worldPos, Cluster_Matrix_LinearZ);
+
+        half4 scatteringColor = SAMPLE_TEXTURE3D_LOD(_VolumetricFogTexture, sampler_VolumetricFogTexture, clusterUV, 0); //worldPos;//srcColor;
+        srcColor.rgb = scatteringColor.rgb + srcColor.rgb * scatteringColor.a;
+
+        MainColorBuffer[globalIdx.xy] = srcColor;
+}
+
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel FogandAO_OP
+
+[numthreads(8, 8, 1)]
+void FogandAO_OP(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+	half4 srcColor = MainColorBuffer[globalIdx.xy];
+
+	float srcDepth = LOAD_TEXTURE2D(MainDepthBuffer, globalIdx.xy).x;
+
+	float4 worldPos1 = GetWorldPosFromThreadID(globalIdx, srcDepth, _InvViewProjMatrix);
+	half3 clusterUV1 = PosWorldToClusterUV(worldPos1, Cluster_Matrix_LinearZ);
+
+	/*float4 worldPos = GetWorldPosFromThreadID_OP(globalIdx, srcDepth, _WorldSpaceCameraPos);
+	half3 clusterUV = GetClusterUVFromPosWS_OP(worldPos);*/
+	//clusterUV.z = 0;
+
+	half4 scatteringColor = SAMPLE_TEXTURE3D_LOD(_VolumetricFogTexture, sampler_VolumetricFogTexture, clusterUV1, 0); //worldPos;//srcColor;
+	srcColor.rgb = scatteringColor.rgb + srcColor.rgb * scatteringColor.a;
+	//srcColor.b = 0;
+
+	/*float4 clipPos = float4((float)globalIdx.x / _ScreenParams.x, (float)globalIdx.y / _ScreenParams.y, 0.0f, 1.0f);
+	srcColor = clipPos;*/
+
+	MainColorBuffer[globalIdx.xy] = srcColor;
+}
+
+#pragma kernel FogandAO_Array
+
+RW_TEXTURE2D_ARRAY(half4, MainColorBufferStereo);
+TEXTURE2D_ARRAY(MainDepthBufferStereo);
+TEXTURE2D_ARRAY(SSAOBufferStereo);
+float4x4 _InvViewProjMatrixStereo[2];
+
+[numthreads(8, 8, 1)]
+void FogandAO_Array(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+    half mask = LOAD_TEXTURE2D(_R8Buffer, globalIdx.xy).x;
+    if (mask == 1.0)
+    {
+        half4 srcColor = MainColorBufferStereo[globalIdx];//GET_RW_TEXTURE_COLOR(MainColorBuffer, globalIdx);
+
+        float srcDepth = LOAD_TEXTURE2D_ARRAY(MainDepthBufferStereo, globalIdx.xy, globalIdx.z).x;
+        float4 worldPos = GetWorldPosFromThreadID(globalIdx, srcDepth, _InvViewProjMatrixStereo[globalIdx.z]);
+        half3 clusterUV = PosWorldToClusterUV(worldPos, Cluster_Matrix_LinearZ);
+
+        half4 scatteringColor = SAMPLE_TEXTURE3D_LOD(_VolumetricFogTexture, sampler_VolumetricFogTexture, clusterUV, 0); //worldPos;//srcColor;
+        srcColor.rgb = scatteringColor.rgb + srcColor.rgb * scatteringColor.a;
+
+        MainColorBufferStereo[globalIdx] = srcColor;
+    }
+}
