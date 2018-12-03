@@ -79,6 +79,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                             Gizmos.DrawSphere(coord, 0.3f);
 
                             Probe newProbe = new Probe(coord);
+                            Probes.Add(newProbe);
                         }
             }
             else
@@ -105,6 +106,11 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
                 ReprojectCubeToOctan();
             }
+        }
+
+        public void DrawDebugMap(ScriptableRenderContext context, CommandBuffer cmd)
+        {
+
         }
 
         public void ShowDebug(bool show)

@@ -7,8 +7,8 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
     {
         public bool ShowDebug;
         public bool IsDynamic;
-        public float NearPlane;
-        public float FarPlane;
+        public float NearPlane = 0.3f;
+        public float FarPlane = 1000.0f;
 
         public Vector3Int ProbeDimensions = new Vector3Int(4, 4, 4);
         
@@ -16,7 +16,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
         void Start()
         {
             AllocateProbes();
-            ProbeManager.instance.UpdateProbeSettings(IsDynamic, ShowDebug, NearPlane, FarPlane);
+            UpdateProbeSettings();
         }
 
         // Update is called once per frame
@@ -28,6 +28,11 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
         public void AllocateProbes()
         {
             ProbeManager.instance.AllocateProbes(ProbeDimensions, this.gameObject.transform);
+        }
+
+        public void UpdateProbeSettings()
+        {
+            ProbeManager.instance.UpdateProbeSettings(IsDynamic, ShowDebug, NearPlane, FarPlane);
         }
 
 #if UNITY_EDITOR

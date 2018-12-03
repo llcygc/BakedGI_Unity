@@ -13,14 +13,20 @@ namespace UnityEditor.Experimental.Rendering.ClusterPipeline
     public class GI_SettingsEditor : Editor
     {
         SerializedProperty isDynamic;
-        SerializedProperty probeDimension;
         SerializedProperty showDebug;
+        SerializedProperty nearPlane;
+        SerializedProperty farPlane;
+
+        SerializedProperty probeDimension;
 
         private void OnEnable()
         {
-            isDynamic = serializedObject.FindProperty("IsDynamic");
             probeDimension = serializedObject.FindProperty("ProbeDimensions");
+
+            isDynamic = serializedObject.FindProperty("IsDynamic");
             showDebug = serializedObject.FindProperty("ShowDebug");
+            nearPlane = serializedObject.FindProperty("NearPlane");
+            farPlane = serializedObject.FindProperty("FarPlane");
         }
 
         public override void OnInspectorGUI()
@@ -28,15 +34,20 @@ namespace UnityEditor.Experimental.Rendering.ClusterPipeline
             serializedObject.Update();
 
             EditorGUI.BeginChangeCheck();
-            EditorGUILayout.PropertyField(showDebug);
+            {
+                EditorGUILayout.PropertyField(isDynamic);
+                EditorGUILayout.PropertyField(showDebug);
+                EditorGUILayout.PropertyField(nearPlane);
+                EditorGUILayout.PropertyField(farPlane);
+            }
             if (EditorGUI.EndChangeCheck())
             {
-
+                (serializedObject.targetObject as GI_Settings).UpdateProbeSettings();
             }
 
-            EditorGUILayout.PropertyField(isDynamic);
-            EditorGUILayout.PropertyField(probeDimension);
+            EditorGUILayout.Space();
 
+            EditorGUILayout.PropertyField(probeDimension);
             if (GUILayout.Button("Update Probes"))
             {
                 (serializedObject.targetObject as GI_Settings).AllocateProbes();
