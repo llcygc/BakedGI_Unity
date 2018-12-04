@@ -1,12 +1,14 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
 
 namespace Viva.Rendering.RenderGraph.ClusterPipeline
 {
-    public class Probe
+    public class Probe : IDisposable
     {
         public Vector3 position;
         public Vector4 scaleOffset;
@@ -37,13 +39,20 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
         }
     }
 
-    public class ProbeManager
+    public class ProbeManager : IDisposable
     {
         public struct ProbeData
         {
             Vector3 position;
             Vector4 scaleOffset;
         }
+
+        private const uint PROBE_RES = 1024;
+        private const uint MAX_LIGHTS_COUNT = 64;
+
+        ShaderPassName[] m_GIPassNames = { ClusterShaderPassNames.s_ForwardBaseName, ClusterShaderPassNames.s_ClusterForwardName, ClusterShaderPassNames.s_SRPDefaultUnlitName };
+        private ClusterPass.LightManager m_ProbeLightManager = new ClusterPass.LightManager();
+
         //>>> System.Lazy<T> is broken in Unity (legacy runtime) so we'll have to do it ourselves :|
         static readonly ProbeManager s_Instance = new ProbeManager();
         public static ProbeManager instance { get { return s_Instance; } }
@@ -53,33 +62,70 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
         public bool showDebug;
         public Vector3 ProbeVolumeDimension;
         public List<Probe> Probes = new List<Probe>();
+        public List<GameObject> DebugSpheres = new List<GameObject>();
 
         private float NearPlane = 0.3f;
         private float FarPlane = 1000.0f;
 
         ComputeBuffer ProbeDataBuffer;
 
+        CullResults m_cullResults;
+        CachedShadowSettings m_ShadowSettings;
+        ShadowInitParameters m_ShadowInitParams;
+
         RenderTexture radianceMapOctan;
         RenderTexture normalMapOctan;
+        RenderTexture probeDepth;
 
-        public void AllocateProbes(Vector3 dimenson, Transform probeVolume)
+        Material ProbeDebugMaterial;
+
+        public void AllocateProbes(Vector3Int dimension, Transform probeVolume)
         {
-            if (dimenson.x > 0 && dimenson.y > 0 && dimenson.z > 0)
+            int destCount = dimension.x * dimension.y * dimension.z;
+            int origCount = Probes.Count();
+            if (dimension.x > 0 && dimension.y > 0 && dimension.z > 0)
             {
                 needRender = true;
-                Probes.Clear();
+                //Probes.Clear();
+                if (destCount < origCount)
+                {
+                    Probes.Capacity = destCount;
+                    DebugSpheres.Capacity = destCount;
+                }
 
-                for (int i = 0; i < dimenson.x; i++)
-                    for (int j = 0; j < dimenson.y; j++)
-                        for (int k = 0; k < dimenson.z; k++)
+                for (int i = 0; i < dimension.x; i++)
+                    for (int j = 0; j < dimension.y; j++)
+                        for (int k = 0; k < dimension.z; k++)
                         {
-                            Vector3 coord = new Vector3((float)i / (dimenson.x - 1) - 0.5f, (float)j / (dimenson.y - 1) - 0.5f, (float)k / (dimenson.z - 1) - 0.5f);
+                            int index = i * dimension.y * dimension.z + j * dimension.z + k;
+                            Vector3 coord = new Vector3((float)i / (dimension.x - 1) - 0.5f, (float)j / (dimension.y - 1) - 0.5f, (float)k / (dimension.z - 1) - 0.5f);
                             coord = probeVolume.localToWorldMatrix.MultiplyPoint(coord);
-                            Gizmos.color = new Color(0.0f, 1.0f, 1.0f, 1.0f);
-                            Gizmos.DrawSphere(coord, 0.3f);
-
-                            Probe newProbe = new Probe(coord);
-                            Probes.Add(newProbe);
+                            if (index >= origCount)
+                            {
+                                Probe newProbe = new Probe(coord);
+                                Probes.Add(newProbe);
+                                GameObject debugSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                                MeshRenderer mesh = debugSphere.GetComponent<MeshRenderer>();
+                                if (ProbeDebugMaterial)
+                                    mesh.material = ProbeDebugMaterial;
+                                debugSphere.SetActive(showDebug);
+                                debugSphere.transform.position = coord;
+                                DebugSpheres.Add(debugSphere);
+                            }
+                            else
+                            {
+                                Probes[index].position = coord;
+                                if(DebugSpheres[i] == null)
+                                {
+                                    DebugSpheres[i] = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                                    MeshRenderer mesh = DebugSpheres[i].GetComponent<MeshRenderer>();
+                                    if (ProbeDebugMaterial)
+                                        mesh.material = ProbeDebugMaterial;
+                                }
+                                    
+                                DebugSpheres[i].transform.position = coord;
+                                DebugSpheres[i].SetActive(showDebug);
+                            }
                         }
             }
             else
@@ -94,18 +140,164 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
             showDebug = debug;
             NearPlane = near;
             FarPlane = far;
+
+            for(int i = 0; i < DebugSpheres.Count; i++)
+            {
+                DebugSpheres[i].SetActive(showDebug);
+            }
         }
 
-        public void Render(ScriptableRenderContext context, CommandBuffer cmd)
+        public void Build(ClusterRenderPipelineResources resources, FrameClusterConfigration clusterConifg, ShadowInitParameters shadowInitParameters, CachedShadowSettings shadowSettings)
+        {
+            m_ProbeLightManager.Build(resources, clusterConifg, shadowInitParameters, shadowSettings);
+            m_ProbeLightManager.AllocateResolutionDependentResources((int)PROBE_RES, (int)PROBE_RES, clusterConifg);
+            m_ShadowSettings = shadowSettings;
+            m_ShadowInitParams = shadowInitParameters;
+
+            RenderTextureDescriptor depthDesc = new RenderTextureDescriptor(1024, 1024, RenderTextureFormat.Depth);
+            depthDesc.dimension = TextureDimension.Cube;
+            probeDepth = new RenderTexture(depthDesc);
+
+            ProbeDebugMaterial = new Material(Shader.Find("Unlit/GI_ProbeDebug"));
+        }
+
+        public void Render(ScriptableRenderContext renderContext, CommandBuffer cmd)
         {
             if (needRender || isDynamic)
             {
                 needRender = false;
 
+                GameObject probeCamObj = new GameObject("Probe Camera");
+                probeCamObj.hideFlags = HideFlags.HideAndDontSave;
+                Camera probeCamera = probeCamObj.AddComponent<Camera>();
+                probeCamera.enabled = false;
+                probeCamera.renderingPath = RenderingPath.Forward;
+                probeCamera.nearClipPlane = NearPlane;
+                probeCamera.farClipPlane = FarPlane;
+                probeCamera.depthTextureMode = DepthTextureMode.None;
+                probeCamera.clearFlags = CameraClearFlags.SolidColor | CameraClearFlags.Depth;
+                probeCamera.backgroundColor = Color.black;
+                probeCamera.orthographic = false;
+                probeCamera.hideFlags = HideFlags.HideAndDontSave;
+                probeCamera.allowMSAA = false;
+                probeCamera.stereoTargetEye = StereoTargetEyeMask.None;
+                probeCamera.fieldOfView = 90.0f;
+                probeCamObj.SetActive(false);
 
+                RGCamera rgCam = RGCamera.Get(probeCamera, null, 128, false);
 
+                for (int i = 0; i < Probes.Count; i++)
+                {
+                    probeCamObj.transform.position = Probes[i].position;
+                    for (int j = 0; j < 6; j++)
+                    {
+                        m_ProbeLightManager.NewFrame();
+
+                        ScriptableCullingParameters cullingParams;
+
+                        if (!CullResults.GetCullingParameters(probeCamera, false, out cullingParams))
+                        {
+                            continue;
+                        }
+
+                        CullResults.Cull(ref cullingParams, renderContext, ref m_cullResults);
+                        m_ProbeLightManager.UpdateCullingParameters(ref cullingParams, false);
+                        m_ProbeLightManager.PrepareLightsDataForGPU(cmd, m_ShadowSettings, m_cullResults, probeCamera, false);
+
+                        bool enableStaticShadowmap = false;
+                        if (m_ShadowSettings.StaticShadowmap)
+                        {
+                            enableStaticShadowmap = true;
+                            cmd.SetGlobalTexture(ClusterShaderIDs._StaticShadowmapExp, m_ShadowSettings.StaticShadowmap);
+                        }
+
+                        var clusterShadowSettings = VolumeManager.instance.stack.GetComponent<ClusterShadowSettings>();
+                        if (clusterShadowSettings)
+                        {
+                            m_ShadowSettings.MaxShadowDistance = clusterShadowSettings.MaxShadowDistance;
+                            m_ShadowSettings.MaxShadowCasters = clusterShadowSettings.MaxShadowCasters;
+                            m_ShadowSettings.ShadowmapRes = clusterShadowSettings.ShadowMapResolution;
+                            m_ShadowSettings.StaticShadowmapRes = clusterShadowSettings.StaticShadowMapResolution;
+                            m_ShadowSettings.StaticShadowmap = clusterShadowSettings.staticShadowmap.value;
+                        }
+                        else
+                        {
+                            m_ShadowSettings.MaxShadowDistance = 1000.0f;
+                            m_ShadowSettings.MaxShadowCasters = 5;
+                            m_ShadowSettings.ShadowmapRes = new Vector2Int(m_ShadowInitParams.shadowAtlasWidth, m_ShadowInitParams.shadowAtlasHeight);
+                            m_ShadowSettings.StaticShadowmapRes = Vector2Int.one;
+                            m_ShadowSettings.StaticShadowmap = null;
+                        }
+
+                        m_ProbeLightManager.RenderShadows(renderContext, cmd, m_cullResults);
+                        m_ProbeLightManager.PostBlurExpShadows(cmd, 1);
+                        m_ProbeLightManager.ClusterLightCompute(rgCam, cmd);
+                        renderContext.ExecuteCommandBuffer(cmd);
+                        cmd.Clear();
+                        renderContext.SetupCameraProperties(probeCamera, rgCam.StereoEnabled); // Need to recall SetupCameraProperties after m_ShadowPass.Render
+                        rgCam.SetupGlobalParams(cmd, 0, 0);
+
+                        RenderTargetIdentifier[] rendertargets = { Probes[i].RadianceTexture, Probes[i].NormalTexture };
+                        cmd.SetRenderTarget(Probes[i].RadianceTexture, probeDepth, 0, (CubemapFace)j);
+                        cmd.ClearRenderTarget(true, true, probeCamera.backgroundColor.linear);
+                        RendererConfiguration settings = RendererConfiguration.PerObjectReflectionProbes | RendererConfiguration.PerObjectLightmaps | RendererConfiguration.PerObjectLightProbe;
+                        RenderRendererList(m_cullResults, rgCam.camera, renderContext, cmd, m_GIPassNames, RGRenderQueue.k_RenderQueue_AllOpaque, settings);
+
+                        //cmd.SetRenderTarget(Probes[i].NormalTexture, probeDepth, 0, CubemapFace.NegativeX);
+                        renderContext.ExecuteCommandBuffer(cmd);
+                        cmd.Clear();
+                        renderContext.Submit();
+                    }
+                }
+                
                 ReprojectCubeToOctan();
+
+                UnityEngine.Object.DestroyImmediate(probeCamera);
+                UnityEngine.Object.DestroyImmediate(probeCamObj);
             }
+        }
+
+        private void RenderRendererList(CullResults cullResults,
+                                            Camera cam,
+                                            ScriptableRenderContext renderContext,
+                                            CommandBuffer cmd,
+                                            ShaderPassName[] passNames,
+                                            RenderQueueRange inRenderQueueRange,
+                                            RendererConfiguration rendererConfig = 0,
+                                            RenderStateBlock? stateBlock = null,
+                                            Material overrideMaterial = null)
+        {
+            //if (!m_CurrentDebugDisplaySettings.renderingDebugSettings.displayOpaqueObjects)
+            //    return;
+
+            // This is done here because DrawRenderers API lives outside command buffers so we need to make call this before doing any DrawRenders
+            renderContext.ExecuteCommandBuffer(cmd);
+            cmd.Clear();
+
+            var drawSettings = new DrawRendererSettings(cam, ClusterShaderPassNames.s_EmptyName)
+            {
+                rendererConfiguration = rendererConfig,
+                sorting = { flags = SortFlags.CommonOpaque }
+            };
+
+            for (int i = 0; i < passNames.Length; ++i)
+            {
+                drawSettings.SetShaderPassName(i, passNames[i]);
+            }
+
+            if (overrideMaterial != null)
+                drawSettings.SetOverrideMaterial(overrideMaterial, 0);
+
+            var filterSettings = new FilterRenderersSettings(true)
+            {
+                renderQueueRange = inRenderQueueRange
+            };
+
+            if (stateBlock == null)
+                renderContext.DrawRenderers(cullResults.visibleRenderers, ref drawSettings, filterSettings);
+            else
+                renderContext.DrawRenderers(cullResults.visibleRenderers, ref drawSettings, filterSettings, stateBlock.Value);
+
         }
 
         public void DrawDebugMap(ScriptableRenderContext context, CommandBuffer cmd)
@@ -130,7 +322,19 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
         public void PushGlobalParams(CommandBuffer cmd)
         {
+            if(Probes.Count > 0)
+                cmd.SetGlobalTexture("GI_ProbeTexture", Probes[0].RadianceTexture);
+        }
 
+        public void Dispose()
+        {
+            m_ProbeLightManager.CleanUp();
+            Probes.Clear();
+            for (int i = 0; i < DebugSpheres.Count; i++)
+            {
+                UnityEngine.Object.DestroyImmediate(DebugSpheres[i]);
+            }
+            DebugSpheres.Clear();
         }
     }
 }

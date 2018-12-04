@@ -230,7 +230,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
             }
 
             m_LightManager.Build(asset.renderPipelineResources, m_FrameConfig.clusterConfig, asset.shadowInitParams, m_ShadowSettings);
-
+            ProbeManager.instance.Build(asset.renderPipelineResources, m_FrameConfig.clusterConfig, asset.shadowInitParams, m_ShadowSettings);
             m_SkyManager.Build(asset.renderPipelineResources);
             m_SkyManager.skySettings = skySettingsToUse;
 
@@ -428,7 +428,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
         CullResults m_cullResults;
         public override void Render(ScriptableRenderContext renderContext, Camera[] cameras)
-        {            
+        {
             base.Render(renderContext, cameras);
             RenderPipeline.BeginFrameRendering(cameras);
 
@@ -462,6 +462,13 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
             //TODO: Render only visible probes
             var isReflection = cameras.Any(c => c.cameraType == CameraType.Reflection);
+
+            if (!isReflection && cameras.Any(c => c.cameraType != CameraType.Preview))
+            {
+                CommandBuffer probeCmd = CommandBufferPool.Get("Probe Rendering");
+                ProbeManager.instance.Render(renderContext, probeCmd);
+                CommandBufferPool.Release(probeCmd);
+            }
             //if(!isReflection)
             //    Reflections
 
@@ -760,6 +767,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                     if (rgCam.StereoEnabled)
                         renderContext.StopMultiEye(cam);
 
+                    ProbeManager.instance.PushGlobalParams(cmd);
                     RenderForwardOpaque(m_cullResults, rgCam, cam, renderContext, cmd);
 
                     if (rgCam.TaaEnabled)

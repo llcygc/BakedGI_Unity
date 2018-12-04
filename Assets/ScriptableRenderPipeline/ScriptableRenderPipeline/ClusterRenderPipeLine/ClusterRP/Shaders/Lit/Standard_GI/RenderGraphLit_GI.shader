@@ -227,6 +227,7 @@ Shader "Viva/RenderGraph/Lit_GI"
             #pragma multi_compile _ DYNAMICLIGHTMAP_ON
             #pragma multi_compile _ SHADOWS_SHADOWMASK
             #define SHADERPASS SHADERPASS_FORWARD
+			#define USE_LEGACY_UNITY_MATRIX_VARIABLES
 			#include "../../../ShaderVariables.hlsl"
 			#include "../../WindData/WindData.hlsl"
             #include "../../Material.hlsl"

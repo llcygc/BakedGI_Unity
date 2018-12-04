@@ -1753,7 +1753,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9db08020b79d4ba43a4e876c7b677be4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ShowDebug: 0
+  ShowDebug: 1
   IsDynamic: 0
   NearPlane: 0.1
   FarPlane: 1000

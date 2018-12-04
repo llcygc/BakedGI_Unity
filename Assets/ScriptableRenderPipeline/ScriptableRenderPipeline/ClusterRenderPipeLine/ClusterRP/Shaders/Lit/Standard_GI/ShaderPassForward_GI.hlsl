@@ -35,6 +35,7 @@ VertexOutput Vert(VertexInput v)
 
 	o.viewDir = _WorldSpaceCameraPos - o.posWS.xyz;
 
+	v.tangent.w *= -1.0f;
     // initializes o.normal and if _NORMALMAP also o.tangent and o.binormal
     OUTPUT_NORMAL(v, o);
 

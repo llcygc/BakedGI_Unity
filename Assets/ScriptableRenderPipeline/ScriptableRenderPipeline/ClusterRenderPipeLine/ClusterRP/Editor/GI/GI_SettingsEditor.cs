@@ -33,6 +33,7 @@ namespace UnityEditor.Experimental.Rendering.ClusterPipeline
         {
             serializedObject.Update();
 
+            bool needUpdate = false;
             EditorGUI.BeginChangeCheck();
             {
                 EditorGUILayout.PropertyField(isDynamic);
@@ -42,7 +43,7 @@ namespace UnityEditor.Experimental.Rendering.ClusterPipeline
             }
             if (EditorGUI.EndChangeCheck())
             {
-                (serializedObject.targetObject as GI_Settings).UpdateProbeSettings();
+                needUpdate = true;
             }
 
             EditorGUILayout.Space();
@@ -54,6 +55,9 @@ namespace UnityEditor.Experimental.Rendering.ClusterPipeline
             }
 
             serializedObject.ApplyModifiedProperties();
+
+            if (needUpdate)
+                (serializedObject.targetObject as GI_Settings).UpdateProbeSettings();
         }
     }
 }

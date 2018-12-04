@@ -8,7 +8,7 @@ Material:
   m_PrefabInternal: {fileID: 0}
   m_Name: Sponza_Column_c_diffuse
   m_Shader: {fileID: 4800000, guid: bbe519b155ffd4942843f1be24fc4a11, type: 3}
-  m_ShaderKeywords: _DOUBLESIDEDENABLE_OFF
+  m_ShaderKeywords: _BRDF_STANDARD _NORMALMAP
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -20,7 +20,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BumpMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 2320d2ccb158397488a27a645f9a9fc4, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DetailAlbedoMap:
