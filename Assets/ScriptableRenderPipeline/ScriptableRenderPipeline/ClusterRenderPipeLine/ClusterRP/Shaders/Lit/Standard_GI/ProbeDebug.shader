@@ -21,6 +21,12 @@
 			TEXTURECUBE_ARRAY(GI_ProbeTexture);
 			SAMPLER(sampler_GI_ProbeTexture);
 
+			TEXTURECUBE_ARRAY(GI_NormalTexture);
+			SAMPLER(sampler_GI_NormalTexture);
+
+			float _ProbeID;
+			float GI_DebugMode;
+
 			struct appdata
 			{
 				float4 vertex : POSITION;
@@ -31,8 +37,6 @@
 				float3 uv : TEXCOORD0;
 				float4 vertex : SV_POSITION;
 			};
-
-			float _ProbeID;
 			
 			v2f vert (appdata v)
 			{
@@ -46,8 +50,11 @@
 			half4 frag (v2f i) : SV_Target
 			{
 				// sample the texture
-				half3 col = SAMPLE_TEXTURECUBE_ARRAY(GI_ProbeTexture, sampler_GI_ProbeTexture, i.uv, _ProbeID);
-				return half4(col, 1.0f);
+				half4 col = GI_DebugMode == 0 ? SAMPLE_TEXTURECUBE_ARRAY(GI_ProbeTexture, sampler_GI_ProbeTexture, i.uv, _ProbeID) 
+												: SAMPLE_TEXTURECUBE_ARRAY(GI_NormalTexture, sampler_GI_NormalTexture, i.uv, _ProbeID);
+				
+				half3 finalColor = GI_DebugMode == 2 ? col.aaa : col.rgb;
+				return half4(finalColor.rgb, 1.0f);
 			}
 			ENDCG
 		}

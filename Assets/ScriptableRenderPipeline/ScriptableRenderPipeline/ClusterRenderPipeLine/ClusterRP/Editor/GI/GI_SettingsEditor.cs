@@ -14,6 +14,7 @@ namespace UnityEditor.Experimental.Rendering.ClusterPipeline
     {
         SerializedProperty isDynamic;
         SerializedProperty showDebug;
+        SerializedProperty debugMode;
         SerializedProperty nearPlane;
         SerializedProperty farPlane;
 
@@ -27,6 +28,7 @@ namespace UnityEditor.Experimental.Rendering.ClusterPipeline
             showDebug = serializedObject.FindProperty("ShowDebug");
             nearPlane = serializedObject.FindProperty("NearPlane");
             farPlane = serializedObject.FindProperty("FarPlane");
+            debugMode = serializedObject.FindProperty("DebugMode");
         }
 
         public override void OnInspectorGUI()
@@ -38,6 +40,8 @@ namespace UnityEditor.Experimental.Rendering.ClusterPipeline
             {
                 EditorGUILayout.PropertyField(isDynamic);
                 EditorGUILayout.PropertyField(showDebug);
+                EditorGUILayout.PropertyField(debugMode);
+                EditorGUILayout.Space();
                 EditorGUILayout.PropertyField(nearPlane);
                 EditorGUILayout.PropertyField(farPlane);
             }

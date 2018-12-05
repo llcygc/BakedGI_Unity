@@ -55,9 +55,7 @@ VertexOutput Vert(VertexInput v)
 }
 
 // Used for Standard shader
-void Frag(VertexOutput IN,
-    out half4 radiance : SV_Target0,
-    out half4 normalDistance : SV_Target1)
+half4 Frag(VertexOutput IN) : SV_Target0
 {
     UNITY_SETUP_INSTANCE_ID(IN);
 
@@ -113,7 +111,7 @@ void Frag(VertexOutput IN,
 #ifdef LOD_FADE_CROSSFADE
 	LODDitheringTransition(floor(IN.clipPos.xy), unity_LODFade.x);
 #endif
-    radiance = color;
-    normalDistance = half4(inputData.normalWS.xyz, IN.clipPos.z);
+
+    return half4(inputData.normalWS.xyz, IN.clipPos.z);
 
 }

@@ -5,8 +5,16 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 {
     public class GI_Settings : MonoBehaviour
     {
+        public enum ProbeDebugMode
+        {
+            Radiance = 0,
+            Normal,
+            Distance
+        };
         public bool ShowDebug;
+        public ProbeDebugMode DebugMode;
         public bool IsDynamic;
+
         public float NearPlane = 0.3f;
         public float FarPlane = 1000.0f;
 
@@ -35,7 +43,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
         public void UpdateProbeSettings()
         {
-            ProbeManager.instance.UpdateProbeSettings(IsDynamic, ShowDebug, NearPlane, FarPlane);
+            ProbeManager.instance.UpdateProbeSettings(IsDynamic, ShowDebug, NearPlane, FarPlane, DebugMode);
         }
 
 #if UNITY_EDITOR
