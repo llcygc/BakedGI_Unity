@@ -26,7 +26,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
             RenderTextureDescriptor normalDesc = new RenderTextureDescriptor(1024, 1024, RenderTextureFormat.ARGBHalf);
             normalDesc.dimension = TextureDimension.Cube;
-            NormalTexture = new RenderTexture(normalDesc);
+            NormalTexture = new RenderTexture(normalDesc);////
         }
 
         public void Dispose()
@@ -64,6 +64,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
         public List<Probe> Probes = new List<Probe>();
         public List<GameObject> DebugSpheres = new List<GameObject>();
 
+        private TextureCacheCubemap probeCache;
         private float NearPlane = 0.3f;
         private float FarPlane = 1000.0f;
 
@@ -77,7 +78,10 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
         RenderTexture normalMapOctan;
         RenderTexture probeDepth;
 
+        RenderTexture radianceCubeArray;
+
         Material ProbeDebugMaterial;
+        Shader ProbeDebugShader;
 
         public void AllocateProbes(Vector3Int dimension, Transform probeVolume)
         {
@@ -89,8 +93,36 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                 //Probes.Clear();
                 if (destCount < origCount)
                 {
+                    Probes.Clear();
+                    DebugSpheres.Clear();
                     Probes.Capacity = destCount;
                     DebugSpheres.Capacity = destCount;
+                }
+
+                if (destCount != origCount)
+                {
+                    if (radianceCubeArray != null)
+                    {
+                        radianceCubeArray.Release();
+                        radianceCubeArray = null;
+                    }
+
+                    if (probeDepth != null)
+                    {
+                        probeDepth.Release();
+                        probeDepth = null;
+                    }
+
+                    RenderTextureDescriptor radCubeArrayDesc = new RenderTextureDescriptor(1024, 1024, RenderTextureFormat.RGB111110Float);
+                    radCubeArrayDesc.dimension = TextureDimension.CubeArray;
+                    radCubeArrayDesc.volumeDepth = destCount * 6;
+                    radianceCubeArray = new RenderTexture(radCubeArrayDesc);
+
+
+                    RenderTextureDescriptor depthDesc = new RenderTextureDescriptor(1024, 1024, RenderTextureFormat.Depth);
+                    depthDesc.dimension = TextureDimension.CubeArray;
+                    depthDesc.volumeDepth = 6 * destCount;
+                     probeDepth = new RenderTexture(depthDesc);
                 }
 
                 for (int i = 0; i < dimension.x; i++)
@@ -106,8 +138,12 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                                 Probes.Add(newProbe);
                                 GameObject debugSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                                 MeshRenderer mesh = debugSphere.GetComponent<MeshRenderer>();
-                                if (ProbeDebugMaterial)
-                                    mesh.material = ProbeDebugMaterial;
+                                if (mesh)
+                                {
+                                    Material probeMat = new Material(ProbeDebugShader);
+                                    probeMat.SetFloat("_ProbeID", index);
+                                    mesh.sharedMaterial = probeMat;
+                                }
                                 debugSphere.SetActive(showDebug);
                                 debugSphere.transform.position = coord;
                                 DebugSpheres.Add(debugSphere);
@@ -115,16 +151,24 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                             else
                             {
                                 Probes[index].position = coord;
-                                if(DebugSpheres[i] == null)
+                                if(DebugSpheres[index] == null)
                                 {
-                                    DebugSpheres[i] = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                                    MeshRenderer mesh = DebugSpheres[i].GetComponent<MeshRenderer>();
-                                    if (ProbeDebugMaterial)
-                                        mesh.material = ProbeDebugMaterial;
+                                    DebugSpheres[index] = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                                 }
-                                    
-                                DebugSpheres[i].transform.position = coord;
-                                DebugSpheres[i].SetActive(showDebug);
+
+                                MeshRenderer mesh = DebugSpheres[i].GetComponent<MeshRenderer>();
+                                if (mesh)
+                                {
+                                    Material probeMat = mesh.sharedMaterial;
+                                    if (probeMat.shader.name != "Unlit / GI_ProbeDebug")
+                                        probeMat = new Material(ProbeDebugShader);
+
+                                    probeMat.SetFloat("_ProbeID", index);
+                                    mesh.sharedMaterial = probeMat;
+                                }
+
+                                DebugSpheres[index].transform.position = coord;
+                                DebugSpheres[index].SetActive(showDebug);
                             }
                         }
             }
@@ -154,11 +198,8 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
             m_ShadowSettings = shadowSettings;
             m_ShadowInitParams = shadowInitParameters;
 
-            RenderTextureDescriptor depthDesc = new RenderTextureDescriptor(1024, 1024, RenderTextureFormat.Depth);
-            depthDesc.dimension = TextureDimension.Cube;
-            probeDepth = new RenderTexture(depthDesc);
-
             ProbeDebugMaterial = new Material(Shader.Find("Unlit/GI_ProbeDebug"));
+            ProbeDebugShader = Shader.Find("Unlit/GI_ProbeDebug");
         }
 
         public void Render(ScriptableRenderContext renderContext, CommandBuffer cmd)
@@ -182,16 +223,20 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                 probeCamera.allowMSAA = false;
                 probeCamera.stereoTargetEye = StereoTargetEyeMask.None;
                 probeCamera.fieldOfView = 90.0f;
+                probeCamera.aspect = 1;
                 probeCamObj.SetActive(false);
 
-                RGCamera rgCam = RGCamera.Get(probeCamera, null, 128, false);
+                Quaternion[] rotations = { Quaternion.Euler(90, 0, 0), Quaternion.Euler(0, 90, 0), Quaternion.Euler(0, 0, 0), Quaternion.Euler(-90, 0, 0), Quaternion.Euler(0, -90, 0), Quaternion.Euler(0, 180, 0) };
+                CubemapFace[] faces = { CubemapFace.PositiveY, CubemapFace.PositiveX, CubemapFace.PositiveZ, CubemapFace.NegativeY, CubemapFace.NegativeX, CubemapFace.NegativeZ };
 
                 for (int i = 0; i < Probes.Count; i++)
                 {
                     probeCamObj.transform.position = Probes[i].position;
                     for (int j = 0; j < 6; j++)
                     {
+                        probeCamObj.transform.rotation = rotations[j];
                         m_ProbeLightManager.NewFrame();
+                        RGCamera rgCam = RGCamera.Get(probeCamera, null, 128, false);
 
                         ScriptableCullingParameters cullingParams;
 
@@ -229,23 +274,20 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                             m_ShadowSettings.StaticShadowmap = null;
                         }
 
-                        m_ProbeLightManager.RenderShadows(renderContext, cmd, m_cullResults);
-                        m_ProbeLightManager.PostBlurExpShadows(cmd, 1);
-                        m_ProbeLightManager.ClusterLightCompute(rgCam, cmd);
                         renderContext.ExecuteCommandBuffer(cmd);
                         cmd.Clear();
                         renderContext.SetupCameraProperties(probeCamera, rgCam.StereoEnabled); // Need to recall SetupCameraProperties after m_ShadowPass.Render
+                        m_ProbeLightManager.RenderShadows(renderContext, cmd, m_cullResults);
+                        m_ProbeLightManager.PostBlurExpShadows(cmd, 1);
+                        m_ProbeLightManager.ClusterLightCompute(rgCam, cmd);
                         rgCam.SetupGlobalParams(cmd, 0, 0);
 
-                        RenderTargetIdentifier[] rendertargets = { Probes[i].RadianceTexture, Probes[i].NormalTexture };
-                        cmd.SetRenderTarget(Probes[i].RadianceTexture, probeDepth, 0, (CubemapFace)j);
+                        //RenderTargetIdentifier[] rendertargets = { Probes[i].RadianceTexture, Probes[i].NormalTexture };
+                        cmd.SetRenderTarget(radianceCubeArray, probeDepth, 0, CubemapFace.Unknown, i * 6 + (int)faces[j]);
                         cmd.ClearRenderTarget(true, true, probeCamera.backgroundColor.linear);
                         RendererConfiguration settings = RendererConfiguration.PerObjectReflectionProbes | RendererConfiguration.PerObjectLightmaps | RendererConfiguration.PerObjectLightProbe;
                         RenderRendererList(m_cullResults, rgCam.camera, renderContext, cmd, m_GIPassNames, RGRenderQueue.k_RenderQueue_AllOpaque, settings);
-
-                        //cmd.SetRenderTarget(Probes[i].NormalTexture, probeDepth, 0, CubemapFace.NegativeX);
-                        renderContext.ExecuteCommandBuffer(cmd);
-                        cmd.Clear();
+                        renderContext.DrawSkybox(probeCamera);
                         renderContext.Submit();
                     }
                 }
@@ -323,7 +365,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
         public void PushGlobalParams(CommandBuffer cmd)
         {
             if(Probes.Count > 0)
-                cmd.SetGlobalTexture("GI_ProbeTexture", Probes[0].RadianceTexture);
+                cmd.SetGlobalTexture("GI_ProbeTexture", radianceCubeArray);
         }
 
         public void Dispose()
@@ -335,6 +377,8 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                 UnityEngine.Object.DestroyImmediate(DebugSpheres[i]);
             }
             DebugSpheres.Clear();
+            radianceCubeArray.Release();
+            probeDepth.Release();
         }
     }
 }

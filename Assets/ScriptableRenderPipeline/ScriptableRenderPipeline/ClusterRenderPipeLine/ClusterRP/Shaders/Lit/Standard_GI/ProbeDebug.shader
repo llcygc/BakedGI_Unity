@@ -2,24 +2,24 @@
 {
 	Properties
 	{
-		_ProbeID("Probe ID", Vector) = (0, 0, 0)
+		_ProbeID("Probe ID", Int) = 0
 	}
 		SubShader
 	{
 		Tags { "RenderType" = "Opaque" }
-		LOD 100
 
 		Pass
 		{
 			CGPROGRAM
+			#pragma target 5.0
 			#pragma vertex vert
 			#pragma fragment frag
-			// make fog work
-			#pragma multi_compile_fog
+			
+			//#include "UnityCG.cginc"
+			#include "CoreRP/ShaderLibrary/Common.hlsl"
 
-			#include "UnityCG.cginc"
-
-			UNITY_DECLARE_TEXCUBE(GI_ProbeTexture);			
+			TEXTURECUBE_ARRAY(GI_ProbeTexture);
+			SAMPLER(sampler_GI_ProbeTexture);
 
 			struct appdata
 			{
@@ -32,22 +32,22 @@
 				float4 vertex : SV_POSITION;
 			};
 
-			sampler2D _MainTex;
-			float4 _MainTex_ST;
+			float _ProbeID;
 			
 			v2f vert (appdata v)
 			{
 				v2f o;
 				o.vertex = UnityObjectToClipPos(v.vertex);
 				o.uv = v.vertex.xyz;
+				o.uv.y *= -1;
 				return o;
 			}
 			
-			fixed4 frag (v2f i) : SV_Target
+			half4 frag (v2f i) : SV_Target
 			{
 				// sample the texture
-				fixed4 col = UNITY_SAMPLE_TEXCUBE(GI_ProbeTexture, i.uv);
-				return col;
+				half3 col = SAMPLE_TEXTURECUBE_ARRAY(GI_ProbeTexture, sampler_GI_ProbeTexture, i.uv, _ProbeID);
+				return half4(col, 1.0f);
 			}
 			ENDCG
 		}
