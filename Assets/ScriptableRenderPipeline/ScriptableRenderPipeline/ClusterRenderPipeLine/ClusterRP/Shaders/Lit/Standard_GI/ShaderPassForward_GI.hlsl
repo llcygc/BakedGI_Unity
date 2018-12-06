@@ -89,20 +89,20 @@ half4 Frag(VertexOutput IN) : SV_Target
     sliceIndex = IN.stereoTargetEyeIndex;
 #endif
 
-//#ifdef SCREEN_SHADOW
-//	int2 screenCoord = IN.clipPos.xy;//(IN.screenPos.xy / IN.screenPos.w) * _ScreenSize;
-//#ifdef _BRDF_ANISO
-//    color.rgb += SURFACE_LIGHTING_CLUSTER_DIRECT_ANISO_SCREENSHADOW(brdfDataDirect, int3(screenCoord.xy, sliceIndex), inputData.normalWS, inputData.tangentWS, inputData.viewDirectionWS, inputData.positionWS, inputData.clusterId);
-//#else
-//    color.rgb += SURFACE_LIGHTING_CLUSTER_DIRECT_SCREENSHADOW(brdfDataDirect, int3(screenCoord.xy, sliceIndex), inputData.normalWS, inputData.viewDirectionWS, inputData.positionWS, inputData.clusterId);
-//#endif
-//#else
-//#ifdef _BRDF_ANISO
-//    color.rgb += SURFACE_LIGHTING_CLUSTER_DIRECT_ANISO(brdfDataDirect, inputData.normalWS, inputData.tangentWS, inputData.viewDirectionWS, inputData.positionWS, inputData.clusterId);
-//#else
-//    color.rgb += SURFACE_LIGHTING_CLUSTER_DIRECT(brdfDataDirect, inputData.normalWS, inputData.viewDirectionWS, inputData.positionWS, inputData.clusterId);
-//#endif
-//#endif
+#ifdef SCREEN_SHADOW
+	int2 screenCoord = IN.clipPos.xy;//(IN.screenPos.xy / IN.screenPos.w) * _ScreenSize;
+#ifdef _BRDF_ANISO
+    color.rgb += SURFACE_LIGHTING_CLUSTER_DIRECT_ANISO_SCREENSHADOW(brdfDataDirect, int3(screenCoord.xy, sliceIndex), inputData.normalWS, inputData.tangentWS, inputData.viewDirectionWS, inputData.positionWS, inputData.clusterId);
+#else
+    color.rgb += SURFACE_LIGHTING_CLUSTER_DIRECT_SCREENSHADOW(brdfDataDirect, int3(screenCoord.xy, sliceIndex), inputData.normalWS, inputData.viewDirectionWS, inputData.positionWS, inputData.clusterId);
+#endif
+#else
+#ifdef _BRDF_ANISO
+    color.rgb += SURFACE_LIGHTING_CLUSTER_DIRECT_ANISO(brdfDataDirect, inputData.normalWS, inputData.tangentWS, inputData.viewDirectionWS, inputData.positionWS, inputData.clusterId);
+#else
+    //color.rgb += SURFACE_LIGHTING_CLUSTER_DIRECT(brdfDataDirect, inputData.normalWS, inputData.viewDirectionWS, inputData.positionWS, inputData.clusterId);
+#endif
+#endif
 
 #ifdef _FORWARD_CLUSTER_FOG
     half4 scatteringColor = SAMPLE_TEXTURE3D_LOD(_VolumetricFogTexture, sampler_VolumetricFogTexture, inputData.clusterUV, 0);

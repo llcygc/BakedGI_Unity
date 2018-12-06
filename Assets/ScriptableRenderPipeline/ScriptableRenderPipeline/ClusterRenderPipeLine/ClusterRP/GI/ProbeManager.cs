@@ -188,7 +188,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
                 CoreUtils.SafeRelease(ProbeDataBuffer);
                 ProbeDataBuffer = new ComputeBuffer(Probes.Count, System.Runtime.InteropServices.Marshal.SizeOf(typeof(ProbeData)));
-                ProbeDataBuffer.SetData(ProbeDatas.ToArray());
+                ProbeDataBuffer.SetData(ProbeDatas);
             }
             else
             {
@@ -312,7 +312,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
                         //RenderTargetIdentifier[] rendertargets = { Probes[i].RadianceTexture, Probes[i].NormalTexture };
                         cmd.SetRenderTarget(normalMapArray, probeDepth, 0, CubemapFace.Unknown, i * 6 + (int)faces[j]);
-                        cmd.ClearRenderTarget(true, true, new Color(0, 0, 0, 0));
+                        cmd.ClearRenderTarget(true, true, new Color(0, 0, 0, 1));
                         RenderRendererList(m_cullResults, rgCam.camera, renderContext, cmd, m_NormalPassNames, RGRenderQueue.k_RenderQueue_AllOpaque);
 
                         renderContext.Submit();

@@ -70,8 +70,7 @@
 												: SAMPLE_TEXTURECUBE_ARRAY(GI_NormalTexture, sampler_GI_NormalTexture, i.uv, _ProbeID);
 				
 				half3 finalColor = GI_DebugMode == 2 ? col.aaa : col.rgb;
-				//return half4(finalColor.rgb, 1.0f);
-				return half4(IndexToCoord(_ProbeID), 1.0f);
+				return half4(finalColor.rgb, 1.0f);
 			}
 			ENDCG
 		}

@@ -4,7 +4,7 @@
 
 struct ProbeData
 {
-	float4 position;
+	float3 position;
 	float4 scaleOffset;
 	float4 probeID;
 };
@@ -90,7 +90,7 @@ uint FetchClosestProbe(float3 worldPos, float3 dir, uint indices[8])
 	return index;
 }
 
-float DebugCloset(float3 worldPos, float3 dir, uint indices[8])
+float3 DebugCloset(float3 worldPos, float3 dir, uint indices[8])
 {
 	float cosTheta = 0;
 	uint index = 0;
@@ -116,19 +116,19 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 	half3 color = 0;
 
 	int count = 0;
-	float step = 0.1f;
-	for (int i = 0; i < 1; i++)
+	float step = 0.5f;
+	for (int i = 0; i < 1/*SAMPLE_COUNT*/; i++)
 	{
-		/*float divX = floor(i / 8);
+		float divX = floor(i / 8);
 		float divY = i % 8;
 		float theta = 2 * PI * (divX / SAMPLE_DIM);
 		float phi = 0.5 * PI * (divY / SAMPLE_DIM);
 
 		float x = sin(phi) * cos(theta);
 		float y = sin(phi) * sin(theta);
-		float z = cos(phi);*/
+		float z = cos(phi);
 
-		float3 dir = normalWS/* * z + tangent * y + bitangent * z*/;
+		float3 dir = normalWS /** z + tangent * y + bitangent * z*/;
 		uint closestIndex = FetchClosestProbe(worldPos, dir, indices);
 
 		ProbeData pData = ProbeDataBuffer[indices[closestIndex]];
@@ -142,9 +142,8 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 			float distSqr = dot(localPos, localPos);
 			float3 sampleCoord = localPos;
 			sampleCoord.y *= -1;
-			half3 radColor = SAMPLE_TEXTURECUBE_ARRAY(GI_ProbeTexture, sampler_GI_ProbeTexture, sampleCoord, closestIndex);
 			half4 normalDist = SAMPLE_TEXTURECUBE_ARRAY(GI_NormalTexture, sampler_GI_NormalTexture, sampleCoord, closestIndex);
-			if (distSqr >= normalDist.w * normalDist.w * 1000 * 1000)
+			if (normalDist.w < 1 && distSqr > normalDist.w * normalDist.w * 1000 * 1000)
 			{
 				hit = true;
 				firstLength = j * 0.5;
@@ -157,20 +156,19 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 		half4 hitNormalDist;
 		float3 pos;
 		float distSqr;
-		if (lastLength != firstLength && hit)
+		if (lastLength < firstLength && hit)
 		{
 			count++;
 			for (int j = 0; j < 32; j++)
 			{
-				float3 localPos = (worldPos + dir * j * (firstLength - lastLength) / 32) - pData.position;
+				float3 localPos = (worldPos + dir * ( firstLength + j * step / 32)) - pData.position;
 				float tempdistSqr = dot(localPos, localPos);
 				float3 sampleCoord = localPos;
 				sampleCoord.y *= -1;
-				half3 radColor = SAMPLE_TEXTURECUBE_ARRAY(GI_ProbeTexture, sampler_GI_ProbeTexture, sampleCoord, closestIndex);
 				half4 normalDist = SAMPLE_TEXTURECUBE_ARRAY(GI_NormalTexture, sampler_GI_NormalTexture, sampleCoord, closestIndex);
-				if (tempdistSqr >= normalDist.w * normalDist.w * 1000 * 1000)
+				if (tempdistSqr > normalDist.w * normalDist.w * 1000 * 1000)
 				{
-					hitColor = radColor;
+					hitColor = SAMPLE_TEXTURECUBE_ARRAY(GI_ProbeTexture, sampler_GI_ProbeTexture, sampleCoord, closestIndex);;
 					hitNormalDist = normalDist;
 					distSqr = tempdistSqr;
 					pos = worldPos + dir * j * (firstLength - lastLength) / 32;
@@ -180,8 +178,7 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 
 			float3 radDir = normalize(pos - worldPos);
 
-			//color += /*saturate(dot(radDir, normalWS)) **/ hitColor/* / ( 2 * PI * distSqr)*/;
-			color = DebugCloset(worldPos, dir, indices);// IndexToCoord(closestIndex);// half3(0, 0.5, 0.5);
+			color += half3(0, 0.5, 0.5);/*saturate(dot(radDir, normalWS)) **/ hitColor/* / ( 2 * PI * distSqr)*/;
 		}
 
 	}
