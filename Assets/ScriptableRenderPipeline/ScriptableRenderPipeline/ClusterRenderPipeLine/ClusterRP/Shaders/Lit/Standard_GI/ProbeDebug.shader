@@ -27,6 +27,12 @@
 			float _ProbeID;
 			float GI_DebugMode;
 
+			CBUFFER_START(ProbeInfo)
+			float4 ProbeDimenson;
+			float4 ProbeMin;
+			float4 ProbeMax;
+			CBUFFER_END
+
 			struct appdata
 			{
 				float4 vertex : POSITION;
@@ -46,7 +52,17 @@
 				o.uv.y *= -1;
 				return o;
 			}
-			
+
+			half3 IndexToCoord(int index)
+			{
+				half3 coord = 0;
+				coord.z = index % ((int)ProbeDimenson.z);
+				coord.y = floor(index % ((int)ProbeDimenson.z * (int)ProbeDimenson.y) / ProbeDimenson.z);
+				coord.x = floor(index / ((int)ProbeDimenson.z * (int)ProbeDimenson.y));
+
+				return coord / ProbeDimenson;
+			}
+
 			half4 frag (v2f i) : SV_Target
 			{
 				// sample the texture
@@ -54,7 +70,8 @@
 												: SAMPLE_TEXTURECUBE_ARRAY(GI_NormalTexture, sampler_GI_NormalTexture, i.uv, _ProbeID);
 				
 				half3 finalColor = GI_DebugMode == 2 ? col.aaa : col.rgb;
-				return half4(finalColor.rgb, 1.0f);
+				//return half4(finalColor.rgb, 1.0f);
+				return half4(IndexToCoord(_ProbeID), 1.0f);
 			}
 			ENDCG
 		}

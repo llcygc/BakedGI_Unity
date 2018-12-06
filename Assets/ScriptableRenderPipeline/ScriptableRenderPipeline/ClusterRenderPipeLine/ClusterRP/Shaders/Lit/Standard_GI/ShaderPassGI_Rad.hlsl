@@ -55,7 +55,7 @@ VertexOutput Vert(VertexInput v)
 }
 
 // Used for Standard shader
-half4 Frag(VertexOutput IN) : SV_Target0
+half3 Frag(VertexOutput IN) : SV_Target0
 {
     UNITY_SETUP_INSTANCE_ID(IN);
 
@@ -111,8 +111,7 @@ half4 Frag(VertexOutput IN) : SV_Target0
 #ifdef LOD_FADE_CROSSFADE
 	LODDitheringTransition(floor(IN.clipPos.xy), unity_LODFade.x);
 #endif
-	float linearZ = Linear01Depth(IN.clipPos.z, _ZBufferParams);
 
-    return half4(inputData.normalWS.xyz, linearZ);
+    return color.rgb;
 
 }
