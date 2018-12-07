@@ -32,7 +32,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
             public Vector4 probeID;
         }
 
-        private const uint PROBE_RES = 1024;
+        private const int PROBE_RES = 1024;
         private const uint MAX_LIGHTS_COUNT = 64;
 
         ShaderPassName[] m_RadiancePassNames = { new ShaderPassName("ClusterGI_Rad") };
@@ -53,7 +53,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
         public List<GameObject> DebugSpheres = new List<GameObject>();
 
         private TextureCacheCubemap probeCache;
-        private float NearPlane = 0.3f;
+        private float NearPlane = 0.1f;
         private float FarPlane = 1000.0f;
 
         ComputeBuffer ProbeDataBuffer;
@@ -71,6 +71,12 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
         Material ProbeDebugMaterial;
         Shader ProbeDebugShader;
+
+        Matrix4x4[] RotationMatrices = new Matrix4x4[6];
+        Matrix4x4 ProjectionMatrix;
+
+        Quaternion[] rotations = { Quaternion.Euler(90, 0, 0), Quaternion.Euler(0, 90, 0), Quaternion.Euler(0, 0, 0), Quaternion.Euler(-90, 0, 0), Quaternion.Euler(0, -90, 0), Quaternion.Euler(0, 180, 0) };
+        CubemapFace[] faces = { CubemapFace.PositiveY, CubemapFace.PositiveX, CubemapFace.PositiveZ, CubemapFace.NegativeY, CubemapFace.NegativeX, CubemapFace.NegativeZ };
 
         public void AllocateProbes(Vector3Int dimension, Transform probeVolume)
         {
@@ -109,18 +115,18 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                         normalMapArray = null;
                     }
 
-                    RenderTextureDescriptor radCubeArrayDesc = new RenderTextureDescriptor(1024, 1024, RenderTextureFormat.RGB111110Float);
+                    RenderTextureDescriptor radCubeArrayDesc = new RenderTextureDescriptor(PROBE_RES, PROBE_RES, RenderTextureFormat.RGB111110Float);
                     radCubeArrayDesc.dimension = TextureDimension.CubeArray;
                     radCubeArrayDesc.volumeDepth = destCount * 6;
                     radianceCubeArray = new RenderTexture(radCubeArrayDesc);
 
-                    RenderTextureDescriptor normCubeArrayDesc = new RenderTextureDescriptor(1024, 1024, RenderTextureFormat.ARGBHalf);
+                    RenderTextureDescriptor normCubeArrayDesc = new RenderTextureDescriptor(PROBE_RES, PROBE_RES, RenderTextureFormat.ARGBHalf);
                     normCubeArrayDesc.dimension = TextureDimension.CubeArray;
                     normCubeArrayDesc.volumeDepth = destCount * 6;
                     normalMapArray = new RenderTexture(normCubeArrayDesc);
 
 
-                    RenderTextureDescriptor depthDesc = new RenderTextureDescriptor(1024, 1024, RenderTextureFormat.Depth);
+                    RenderTextureDescriptor depthDesc = new RenderTextureDescriptor(PROBE_RES, PROBE_RES, RenderTextureFormat.Depth);
                     depthDesc.dimension = TextureDimension.CubeArray;
                     depthDesc.volumeDepth = 6 * destCount;
                     probeDepth = new RenderTexture(depthDesc);
@@ -208,6 +214,8 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
             {
                 DebugSpheres[i].SetActive(showDebug);
             }
+
+            ProjectionMatrix = Matrix4x4.Perspective(90.0f, 1, NearPlane, FarPlane);
         }
 
         public void Build(ClusterRenderPipelineResources resources, FrameClusterConfigration clusterConifg, ShadowInitParameters shadowInitParameters, CachedShadowSettings shadowSettings)
@@ -219,6 +227,12 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
             ProbeDebugMaterial = new Material(Shader.Find("Unlit/GI_ProbeDebug"));
             ProbeDebugShader = Shader.Find("Unlit/GI_ProbeDebug");
+
+            for (int i = 0; i < 6; i++)
+            {
+                RotationMatrices[i] = Matrix4x4.Rotate(rotations[i]);
+                ProjectionMatrix = Matrix4x4.Perspective(90.0f, 1, NearPlane, FarPlane);
+            }
         }
 
         public void Render(ScriptableRenderContext renderContext, CommandBuffer cmd)
@@ -245,8 +259,6 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                 probeCamera.aspect = 1;
                 probeCamObj.SetActive(false);
 
-                Quaternion[] rotations = { Quaternion.Euler(90, 0, 0), Quaternion.Euler(0, 90, 0), Quaternion.Euler(0, 0, 0), Quaternion.Euler(-90, 0, 0), Quaternion.Euler(0, -90, 0), Quaternion.Euler(0, 180, 0) };
-                CubemapFace[] faces = { CubemapFace.PositiveY, CubemapFace.PositiveX, CubemapFace.PositiveZ, CubemapFace.NegativeY, CubemapFace.NegativeX, CubemapFace.NegativeZ };
 
                 for (int i = 0; i < Probes.Count; i++)
                 {
@@ -401,6 +413,8 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                 cmd.SetGlobalVector("ProbeMin", Probes[0].position);
                 cmd.SetGlobalVector("ProbeMax", Probes[count - 1].position);
                 cmd.SetGlobalBuffer("ProbeDataBuffer", ProbeDataBuffer);
+                cmd.SetGlobalMatrixArray("ProbeRotationMatrix", RotationMatrices);
+                cmd.SetGlobalMatrix("ProbeProjMatrix", ProjectionMatrix);
             }
         }
 
