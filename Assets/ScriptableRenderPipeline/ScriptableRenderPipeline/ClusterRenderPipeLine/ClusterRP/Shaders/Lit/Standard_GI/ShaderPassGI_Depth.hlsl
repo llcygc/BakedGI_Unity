@@ -35,7 +35,6 @@ VertexOutput Vert(VertexInput v)
 
 	o.viewDir = _WorldSpaceCameraPos - o.posWS.xyz;
 
-	v.tangent.w *= -1.0f;
     // initializes o.normal and if _NORMALMAP also o.tangent and o.binormal
     OUTPUT_NORMAL(v, o);
 
@@ -56,7 +55,7 @@ VertexOutput Vert(VertexInput v)
 }
 
 // Used for Standard shader
-half4 Frag(VertexOutput IN) : SV_Target
+half Frag(VertexOutput IN) : SV_Target0
 {
     UNITY_SETUP_INSTANCE_ID(IN);
 
@@ -81,28 +80,12 @@ half4 Frag(VertexOutput IN) : SV_Target
     InitializeInputData(IN, normalTS, inputData);
 #endif
 
-    //brdfDataIndirect.bakedGI = SampleGI(IN.lightmapUVOrVertexSH, inputData.normalWS);
-    color.rgb += GlobalIllumination_Trace(brdfDataDirect, inputData.normalWS, IN.tangent, inputData.viewDirectionWS, IN.posWS);
-
-    int sliceIndex = 0;
-#ifdef UNITY_STEREO_INSTANCING_ENABLED
-    sliceIndex = IN.stereoTargetEyeIndex;
+#ifdef LOD_FADE_CROSSFADE
+	LODDitheringTransition(floor(IN.clipPos.xy), unity_LODFade.x);
 #endif
 
-#ifdef SCREEN_SHADOW
-	int2 screenCoord = IN.clipPos.xy;//(IN.screenPos.xy / IN.screenPos.w) * _ScreenSize;
-#ifdef _BRDF_ANISO
-    color.rgb += SURFACE_LIGHTING_CLUSTER_DIRECT_ANISO_SCREENSHADOW(brdfDataDirect, int3(screenCoord.xy, sliceIndex), inputData.normalWS, inputData.tangentWS, inputData.viewDirectionWS, inputData.positionWS, inputData.clusterId);
-#else
-    color.rgb += SURFACE_LIGHTING_CLUSTER_DIRECT_SCREENSHADOW(brdfDataDirect, int3(screenCoord.xy, sliceIndex), inputData.normalWS, inputData.viewDirectionWS, inputData.positionWS, inputData.clusterId);
-#endif
-#else
-#ifdef _BRDF_ANISO
-    color.rgb += SURFACE_LIGHTING_CLUSTER_DIRECT_ANISO(brdfDataDirect, inputData.normalWS, inputData.tangentWS, inputData.viewDirectionWS, inputData.positionWS, inputData.clusterId);
-#else
-    //color.rgb += SURFACE_LIGHTING_CLUSTER_DIRECT(brdfDataDirect, inputData.normalWS, inputData.viewDirectionWS, inputData.positionWS, inputData.clusterId);
-#endif
-#endif
+	float linearZ = Linear01Depth(IN.clipPos.z, _ZBufferParams);
 
-    return color;
+    return linearZ;
+
 }

@@ -24,6 +24,9 @@
 			TEXTURECUBE_ARRAY(GI_NormalTexture);
 			SAMPLER(sampler_GI_NormalTexture);
 
+			TEXTURECUBE_ARRAY(GI_DepthTexture);
+			SAMPLER(sampler_GI_DepthTexture);
+
 			float _ProbeID;
 			float GI_DebugMode;
 
@@ -63,14 +66,15 @@
 				return coord / ProbeDimenson;
 			}
 
-			half4 frag (v2f i) : SV_Target
+			half3 frag(v2f i) : SV_Target
 			{
 				// sample the texture
-				half4 col = GI_DebugMode == 0 ? SAMPLE_TEXTURECUBE_ARRAY(GI_ProbeTexture, sampler_GI_ProbeTexture, i.uv, _ProbeID) 
-												: SAMPLE_TEXTURECUBE_ARRAY(GI_NormalTexture, sampler_GI_NormalTexture, i.uv, _ProbeID);
-				
-				half3 finalColor = GI_DebugMode == 2 ? col.aaa : col.rgb;
-				return half4(finalColor.rgb/*IndexToCoord(_ProbeID)*/, 1.0f);
+				if (GI_DebugMode == 0)
+					return SAMPLE_TEXTURECUBE_ARRAY(GI_ProbeTexture, sampler_GI_ProbeTexture, i.uv, _ProbeID);
+				else if (GI_DebugMode == 1)
+					return SAMPLE_TEXTURECUBE_ARRAY(GI_NormalTexture, sampler_GI_NormalTexture, i.uv, _ProbeID);
+				else
+					return SAMPLE_TEXTURECUBE_ARRAY(GI_DepthTexture, sampler_GI_DepthTexture, i.uv, _ProbeID).rrr;
 			}
 			ENDCG
 		}

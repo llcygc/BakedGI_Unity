@@ -32,11 +32,13 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
             public Vector4 probeID;
         }
 
-        private const int PROBE_RES = 1024;
+        private const int PROBE_RES = 512;
         private const uint MAX_LIGHTS_COUNT = 64;
 
         ShaderPassName[] m_RadiancePassNames = { new ShaderPassName("ClusterGI_Rad") };
         ShaderPassName[] m_NormalPassNames = { new ShaderPassName("ClusterGI") };
+        ShaderPassName[] m_DepthPassNames = { new ShaderPassName("ClusterGI_Depth") };
+
         private ClusterPass.LightManager m_ProbeLightManager = new ClusterPass.LightManager();
 
         //>>> System.Lazy<T> is broken in Unity (legacy runtime) so we'll have to do it ourselves :|
@@ -68,6 +70,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
         RenderTexture radianceCubeArray;
         RenderTexture normalMapArray;
+        RenderTexture depthMapArray;
 
         Material ProbeDebugMaterial;
         Shader ProbeDebugShader;
@@ -115,15 +118,26 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                         normalMapArray = null;
                     }
 
+                    if (depthMapArray != null)
+                    {
+                        depthMapArray.Release();
+                        depthMapArray = null;
+                    }
+
                     RenderTextureDescriptor radCubeArrayDesc = new RenderTextureDescriptor(PROBE_RES, PROBE_RES, RenderTextureFormat.RGB111110Float);
                     radCubeArrayDesc.dimension = TextureDimension.CubeArray;
                     radCubeArrayDesc.volumeDepth = destCount * 6;
                     radianceCubeArray = new RenderTexture(radCubeArrayDesc);
 
-                    RenderTextureDescriptor normCubeArrayDesc = new RenderTextureDescriptor(PROBE_RES, PROBE_RES, RenderTextureFormat.ARGBHalf);
+                    RenderTextureDescriptor normCubeArrayDesc = new RenderTextureDescriptor(PROBE_RES, PROBE_RES, RenderTextureFormat.RGB111110Float);
                     normCubeArrayDesc.dimension = TextureDimension.CubeArray;
                     normCubeArrayDesc.volumeDepth = destCount * 6;
                     normalMapArray = new RenderTexture(normCubeArrayDesc);
+
+                    RenderTextureDescriptor dephtArrayDesc = new RenderTextureDescriptor(PROBE_RES, PROBE_RES, RenderTextureFormat.RHalf);
+                    dephtArrayDesc.dimension = TextureDimension.CubeArray;
+                    dephtArrayDesc.volumeDepth = destCount * 6;
+                    depthMapArray = new RenderTexture(dephtArrayDesc);
 
 
                     RenderTextureDescriptor depthDesc = new RenderTextureDescriptor(PROBE_RES, PROBE_RES, RenderTextureFormat.Depth);
@@ -324,8 +338,13 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
                         //RenderTargetIdentifier[] rendertargets = { Probes[i].RadianceTexture, Probes[i].NormalTexture };
                         cmd.SetRenderTarget(normalMapArray, probeDepth, 0, CubemapFace.Unknown, i * 6 + (int)faces[j]);
-                        cmd.ClearRenderTarget(true, true, new Color(0, 0, 0, 1));
+                        cmd.ClearRenderTarget(true, true, new Color(0, 0, 0));
                         RenderRendererList(m_cullResults, rgCam.camera, renderContext, cmd, m_NormalPassNames, RGRenderQueue.k_RenderQueue_AllOpaque);
+
+                        //RenderTargetIdentifier[] rendertargets = { Probes[i].RadianceTexture, Probes[i].NormalTexture };
+                        cmd.SetRenderTarget(depthMapArray, probeDepth, 0, CubemapFace.Unknown, i * 6 + (int)faces[j]);
+                        cmd.ClearRenderTarget(true, true, new Color(1, 1, 1));
+                        RenderRendererList(m_cullResults, rgCam.camera, renderContext, cmd, m_DepthPassNames, RGRenderQueue.k_RenderQueue_AllOpaque);
 
                         renderContext.Submit();
                     }
@@ -407,6 +426,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
             {
                 cmd.SetGlobalTexture("GI_ProbeTexture", radianceCubeArray);
                 cmd.SetGlobalTexture("GI_NormalTexture", normalMapArray);
+                cmd.SetGlobalTexture("GI_DepthTexture", depthMapArray);
                 cmd.SetGlobalFloat("GI_DebugMode", (float)debugMode);
                 cmd.SetGlobalVector("ProbeDimenson", ProbeVolumeDimension);
                 int count = (int)ProbeVolumeDimension.x * (int)ProbeVolumeDimension.y * (int)ProbeVolumeDimension.z;

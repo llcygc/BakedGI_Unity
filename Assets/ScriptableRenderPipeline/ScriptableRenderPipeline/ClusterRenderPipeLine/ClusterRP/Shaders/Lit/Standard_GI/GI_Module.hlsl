@@ -23,6 +23,9 @@ SAMPLER(sampler_GI_ProbeTexture);
 TEXTURECUBE_ARRAY(GI_NormalTexture);
 SAMPLER(sampler_GI_NormalTexture);
 
+TEXTURECUBE_ARRAY(GI_DepthTexture);
+SAMPLER(sampler_GI_DepthTexture);
+
 StructuredBuffer<ProbeData> ProbeDataBuffer;
 
 int CoordToIndex(int3 coord)
@@ -118,8 +121,8 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 	half3 color = 0;
 
 	int count = 0;
-	float step = 0.5f;
-	for (int i = 0; i < SAMPLE_COUNT; i++)
+	float step = 0.1f;
+    for (int i = 0; i < 1/*SAMPLE_COUNT*/; i++)
 	{
 		float divX = floor(i / SAMPLE_DIM) + 1;
 		float divY = i % SAMPLE_DIM + 1;
@@ -130,7 +133,7 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 		float y = sin(phi) * sin(theta);
 		float z = cos(phi);
 
-		float3 dir = normalWS * z + tangent * y + bitangent * x;
+		float3 dir = normalWS /** z + tangent * y + bitangent * x*/;
 		uint closestIndex = FetchClosestProbe(worldPos, dir, indices);
 
 		ProbeData pData = ProbeDataBuffer[indices[closestIndex]];
@@ -139,16 +142,17 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 		float firstLength = 0;
 		float lastLength = 0;
 		float hitDist = 0;
-		for (int j = 1; j <= 32; j++)
+		for (int j = 1; j <= 64; j++)
 		{
 			float3 localPos = (worldPos + dir * j * step) - pData.position;
 			float dist = length(localPos);
 			float3 sampleCoord = localPos;
 			sampleCoord.y *= -1;
-			half4 normalDist = SAMPLE_TEXTURECUBE_ARRAY(GI_NormalTexture, sampler_GI_NormalTexture, sampleCoord, closestIndex);
-			if (normalDist.w < 1 && dist > normalDist.w * 1000)
+            half probeDist = SAMPLE_TEXTURECUBE_ARRAY(GI_DepthTexture, sampler_GI_DepthTexture, sampleCoord, closestIndex);
+
+            if (probeDist < 1 && dist > probeDist * 1000)
 			{
-				if (dist - normalDist.w * 1000 < 0.7)
+                //if (dist - probeDist * 1000 < 0.7)
 				{
 					hit = true;
 					firstLength = j * 0.5;
@@ -162,32 +166,37 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 		half4 hitNormalDist;
 		float3 pos;
 		float dist;
-		if (lastLength < firstLength && hit)
+        if (hit && lastLength < firstLength)
 		{
-			for (int j = 0; j < 8; j++)
+			for (int j = 1; j <= 8; j++)
 			{
 				float3 localPos = (worldPos + dir * ( firstLength + j * step / 8)) - pData.position;
 				float tempdist = length(localPos);
 				float3 sampleCoord = localPos;
-				sampleCoord.y *= -1;
-				half4 normalDist = SAMPLE_TEXTURECUBE_ARRAY(GI_NormalTexture, sampler_GI_NormalTexture, sampleCoord, closestIndex);
-				if (tempdist > normalDist.w * 1000)
+                sampleCoord.y *= -1;
+                half probeDist = SAMPLE_TEXTURECUBE_ARRAY(GI_DepthTexture, sampler_GI_DepthTexture, sampleCoord, closestIndex);
+                if (tempdist > probeDist * 1000)
 				{
 					count++;
-					hitColor = SAMPLE_TEXTURECUBE_ARRAY(GI_ProbeTexture, sampler_GI_ProbeTexture, sampleCoord, closestIndex);;
-					hitNormalDist = normalDist;
+					hitColor = SAMPLE_TEXTURECUBE_ARRAY(GI_ProbeTexture, sampler_GI_ProbeTexture, sampleCoord, closestIndex);
+                    hitNormalDist = probeDist;
 					dist = tempdist;
-					float distSqr = tempdist / 10.0f;
+                    float distSqr = (firstLength + j * step / 8) / 5.0f;
 					//pos = worldPos + dir * j * (firstLength - lastLength) / 16;
-					color += saturate(dot(dir, normalWS)) * hitColor / ( 2 * PI * distSqr * distSqr);
+                    color += half3(0.3, 0.5, 1); ///*saturate(dot(dir, normalWS)) * */hitColor /*/ (2 * PI * distSqr * distSqr)*/;
 					break;
 				}
 			}
+            color = half3(0.3, 0.5, 1);
 			
 		}
 		//color = dist / 1000;
 		//color = IndexToCoord(closestIndex);
-	}
+
+        float3 localPos = (worldPos/* + dir * j * step*/) - pData.position;
+        localPos.y *= -1;
+        color = SAMPLE_TEXTURECUBE_ARRAY(GI_ProbeTexture, sampler_GI_ProbeTexture, localPos, closestIndex);
+    }
 	
-	return (color / count) * brdfData.diffuse;
+    return color;// (color / count) /** brdfData.diffuse*/;
 }
