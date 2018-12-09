@@ -8,7 +8,7 @@ Material:
   m_PrefabInternal: {fileID: 0}
   m_Name: Blue
   m_Shader: {fileID: 4800000, guid: bbe519b155ffd4942843f1be24fc4a11, type: 3}
-  m_ShaderKeywords: _BRDF_STANDARD _DOUBLESIDEDENABLE_OFF
+  m_ShaderKeywords: _BRDF_STANDARD
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0

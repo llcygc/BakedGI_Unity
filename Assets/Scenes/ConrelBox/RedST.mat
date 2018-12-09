@@ -6,9 +6,9 @@ Material:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInternal: {fileID: 0}
-  m_Name: Red
-  m_Shader: {fileID: 4800000, guid: bbe519b155ffd4942843f1be24fc4a11, type: 3}
-  m_ShaderKeywords: _BRDF_STANDARD
+  m_Name: RedST
+  m_Shader: {fileID: 4800000, guid: 5de4a64850c301547b072b45a00222bb, type: 3}
+  m_ShaderKeywords: _BRDF_STANDARD _DOUBLESIDEDENABLE_OFF
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
