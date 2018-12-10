@@ -69,6 +69,7 @@
 			half3 frag(v2f i) : SV_Target
 			{
 				// sample the texture
+				//return IndexToCoord(_ProbeID);
 				if (GI_DebugMode == 0)
 					return SAMPLE_TEXTURECUBE_ARRAY(GI_ProbeTexture, sampler_GI_ProbeTexture, i.uv, _ProbeID);
 				else if (GI_DebugMode == 1)

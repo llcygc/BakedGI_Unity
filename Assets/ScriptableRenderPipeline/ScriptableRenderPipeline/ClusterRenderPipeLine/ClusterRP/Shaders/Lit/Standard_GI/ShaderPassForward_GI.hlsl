@@ -82,7 +82,7 @@ half4 Frag(VertexOutput IN) : SV_Target
 #endif
 
     //brdfDataIndirect.bakedGI = SampleGI(IN.lightmapUVOrVertexSH, inputData.normalWS);
-    color.rgb += GlobalIllumination_Trace(brdfDataDirect, inputData.normalWS, IN.tangent, inputData.viewDirectionWS, IN.posWS);
+    color.rgb += GlobalIllumination_Trace(brdfDataDirect, inputData.normalWS, IN.tangent, IN.binormal, inputData.viewDirectionWS, IN.posWS);
 
     int sliceIndex = 0;
 #ifdef UNITY_STEREO_INSTANCING_ENABLED
@@ -100,7 +100,7 @@ half4 Frag(VertexOutput IN) : SV_Target
 #ifdef _BRDF_ANISO
     color.rgb += SURFACE_LIGHTING_CLUSTER_DIRECT_ANISO(brdfDataDirect, inputData.normalWS, inputData.tangentWS, inputData.viewDirectionWS, inputData.positionWS, inputData.clusterId);
 #else
-    //color.rgb += SURFACE_LIGHTING_CLUSTER_DIRECT(brdfDataDirect, inputData.normalWS, inputData.viewDirectionWS, inputData.positionWS, inputData.clusterId);
+    color.rgb += SURFACE_LIGHTING_CLUSTER_DIRECT(brdfDataDirect, inputData.normalWS, inputData.viewDirectionWS, inputData.positionWS, inputData.clusterId);
 #endif
 #endif
 
