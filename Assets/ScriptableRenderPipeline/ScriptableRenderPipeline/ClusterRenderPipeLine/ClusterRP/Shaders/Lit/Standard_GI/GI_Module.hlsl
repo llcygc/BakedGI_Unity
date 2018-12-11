@@ -2,6 +2,10 @@
 #define SAMPLE_COUNT 64
 #define SAMPLE_DIM 8
 
+#define TRACE_HIT 0
+#define TRACE_MISS 1
+#define TRACE_UNKNONW 2
+
 struct ProbeData
 {
 	float3 position;
@@ -142,6 +146,17 @@ float3 DebugCloset(float3 worldPos, float3 dir, uint indices[8])
 	return tempCos;
 }
 
+void SortProbes(float3 worldPos, float3 dir, inout uint indices[8])
+{
+
+}
+
+void TraceSingleProbe(uint index, float3 worldPos, float3 dir, out half3 radColor)
+{    
+    ProbeData pData = ProbeDataBuffer[closestIndex];
+
+}
+
 half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 tangent, half3 binormal, half3 viewDirectionWS, float3 worldPos)
 {
 	uint4 indices1 = 0;
@@ -153,7 +168,7 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 	half3 color = 0;
 
 	int count = 0;
-	float step = 1.0f;
+	float step = 0.5f;
     for (int i = 0; i < SAMPLE_COUNT; i++)
 	{
 		float divX = floor(i / SAMPLE_DIM) + 1;
@@ -166,7 +181,24 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 		float z = cos(phi);
 
 		float3 dir = normalWS * z + binormal * y + tangent * x;
-		uint closestIndex = FetchClosestProbe(worldPos, dir, indices);
+        half3 skyColor;
+        
+        SortProbes(dir, indices[8]);
+        
+        //TRACE_HIT 0
+        //TRACE_MISS 1
+        //TRACE_UNKNONW 2
+        uint result = TRACE_UNKNONW;
+        bool traceComplete = false;
+        half3 radColor = 0;
+        
+        for (uint j = 0; j < 8; j++)
+        {
+            if (TraceSingleProbe(indices[j], worldPos, dir, radColor) != TRACE_UNKNONW)
+                break;
+        }
+
+        uint closestIndex = FetchClosestProbe(worldPos, dir, indices);
 
         ProbeData pData = ProbeDataBuffer[closestIndex];
 		
@@ -182,7 +214,7 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 			sampleCoord.y *= -1;
 
             half probeDist = SAMPLE_TEXTURECUBE_ARRAY(GI_DepthTexture, sampler_GI_DepthTexture, sampleCoord, closestIndex);
-
+            
             if (probeDist < 1 && (dist > probeDist * 1000/* + 0.5*/))
 			{
                 //if (dist - probeDist * 1000 < step)
@@ -217,7 +249,7 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 					dist = tempdist;
                     float distSqr = (lastLength + j * step / 8);
 					//pos = worldPos + dir * j * (firstLength - lastLength) / 16;
-                    color += saturate(dot(dir, normalWS)) /** saturate(dot(-dir, hitNormal))*/ * hitColor / (2 * PI * distSqr * distSqr);
+                    color += saturate(dot(dir, normalWS)) * saturate(dot(-dir, hitNormal)) * hitColor / (2 * PI * distSqr * distSqr);
 					//color = probeDist;// lastLength; // half3(0.3, 0.5, 1.0);
 					break;
 				}
