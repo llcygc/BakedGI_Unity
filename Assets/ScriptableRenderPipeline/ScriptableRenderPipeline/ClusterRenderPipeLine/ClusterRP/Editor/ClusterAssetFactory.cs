@@ -32,6 +32,9 @@ namespace UnityEditor.Experimental.Rendering.ClusterPipeline
             string CorePath = ClusterEditorUtils.GetCorePath();
 
             var instance = ScriptableObject.CreateInstance<ClusterRenderPipelineResources>();
+
+            instance.debugViewTilesShader = Load<Shader>(ClusterRenderPipelinePath + "Debug/DebugViewTiles.shader");
+
             instance.clusterLightAssignmentCS = Load<ComputeShader>(ClusterRenderPipelinePath + "Shaders/ClusterCompute.compute");
             instance.volumetricLightingCS = Load<ComputeShader>(ClusterRenderPipelinePath + "Shaders/VolumetricEffect/VolumetricLightCompute.compute");
             instance.volumetricFogMediaCS = Load<ComputeShader>(ClusterRenderPipelinePath + "Shaders/VolumetricEffect/VolumetricFogDensityCompute.compute");
@@ -70,6 +73,7 @@ namespace UnityEditor.Experimental.Rendering.ClusterPipeline
             instance.screenSpaceShadowShader = Load<Shader>(ClusterRenderPipelinePath + "Shaders/PostProcess/ScreenSpaceShadow.shader");
 
             instance.TextureBlurCS = Load<ComputeShader>(ClusterRenderPipelinePath + "Shaders/TextureBlur.compute");
+            instance.CubetoOctanShader = Load<ComputeShader>(ClusterRenderPipelinePath + "Shaders/Lit/Standard_GI/Cube2Octan.compute");
 
             AssetDatabase.CreateAsset(instance, s_RenderPipelineResourcesPath);
             AssetDatabase.SaveAssets();

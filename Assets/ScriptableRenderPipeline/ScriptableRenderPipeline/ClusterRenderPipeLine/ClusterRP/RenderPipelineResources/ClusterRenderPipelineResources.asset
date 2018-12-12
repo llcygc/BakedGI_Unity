@@ -65,7 +65,7 @@ MonoBehaviour:
     type: 3}
   screenSpaceShadowShader: {fileID: 4800000, guid: c7dda8753aa799548b23738ae1f84a2e,
     type: 3}
-  screenSpaceShadowCS: {fileID: 7200000, guid: 41cfd02db63edd3478d0c32b2b7e9128, type: 3}
+  screenSpaceShadowCS: {fileID: 0}
   TextureBlurCS: {fileID: 7200000, guid: 83cd2985fb3de8a429d249c3ff2cfaef, type: 3}
   fogandAOCS: {fileID: 7200000, guid: 3304601eb4c64f844bd43c4fdf42cf8c, type: 3}
   colorGradingCS: {fileID: 7200000, guid: c6e5559350125574db8b9a3f8bec195f, type: 3}
@@ -76,3 +76,4 @@ MonoBehaviour:
   toneMappingCS: {fileID: 0}
   stencilMaskBlit: {fileID: 4800000, guid: 7626b496a02119a4a9e498b8d233925d, type: 3}
   stencilMaskTexture: {fileID: 0}
+  CubetoOctanShader: {fileID: 7200000, guid: e0ed4037bf6d92d41a8c9f54b0cb6735, type: 3}

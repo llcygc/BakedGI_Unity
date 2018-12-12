@@ -57,6 +57,8 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
         private TextureCacheCubemap probeCache;
         private float NearPlane = 0.1f;
         private float FarPlane = 1000.0f;
+        private ComputeShader CubetoOctanShader;
+        private int CubetoOctanKernel;
 
         ComputeBuffer ProbeDataBuffer;
 
@@ -66,6 +68,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
         RenderTexture radianceMapOctan;
         RenderTexture normalMapOctan;
+        RenderTexture depthMapOctan;
         RenderTexture probeDepth;
 
         RenderTexture radianceCubeArray;
@@ -139,11 +142,49 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                     dephtArrayDesc.volumeDepth = destCount * 6;
                     depthMapArray = new RenderTexture(dephtArrayDesc);
 
-
                     RenderTextureDescriptor depthDesc = new RenderTextureDescriptor(PROBE_RES, PROBE_RES, RenderTextureFormat.Depth);
                     depthDesc.dimension = TextureDimension.CubeArray;
                     depthDesc.volumeDepth = 6 * destCount;
                     probeDepth = new RenderTexture(depthDesc);
+
+                    if (radianceMapOctan != null)
+                    {
+                        radianceMapOctan.Release();
+                        radianceMapOctan = null;
+                    }
+
+                    if (normalMapOctan != null)
+                    {
+                        normalMapOctan.Release();
+                        normalMapOctan = null;
+                    }
+
+                    if (depthMapOctan != null)
+                    {
+                        depthMapOctan.Release();
+                        depthMapOctan = null;
+                    }
+
+                    RenderTextureDescriptor radianceMapOctanDesc = new RenderTextureDescriptor(PROBE_RES, PROBE_RES, RenderTextureFormat.RGB111110Float);
+                    radianceMapOctanDesc.dimension = TextureDimension.Tex2DArray;
+                    radianceMapOctanDesc.volumeDepth = destCount;
+                    radianceMapOctanDesc.enableRandomWrite = true;
+                    radianceMapOctan = new RenderTexture(radianceMapOctanDesc);
+                    radianceMapOctan.Create();
+
+                    RenderTextureDescriptor normalMapOctanDesc = new RenderTextureDescriptor(PROBE_RES, PROBE_RES, RenderTextureFormat.RGB111110Float);
+                    normalMapOctanDesc.dimension = TextureDimension.Tex2DArray;
+                    normalMapOctanDesc.volumeDepth = destCount;
+                    normalMapOctanDesc.enableRandomWrite = true;
+                    normalMapOctan = new RenderTexture(normalMapOctanDesc);
+                    normalMapOctan.Create();
+
+                    RenderTextureDescriptor depthMapOctanDesc = new RenderTextureDescriptor(PROBE_RES, PROBE_RES, RenderTextureFormat.RHalf);
+                    depthMapOctanDesc.dimension = TextureDimension.Tex2DArray;
+                    depthMapOctanDesc.volumeDepth = destCount;
+                    depthMapOctanDesc.enableRandomWrite = true;
+                    depthMapOctan = new RenderTexture(depthMapOctanDesc);
+                    depthMapOctan.Create();
                 }
 
                 for (int i = 0; i < dimension.x; i++)
@@ -234,6 +275,10 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
         public void Build(ClusterRenderPipelineResources resources, FrameClusterConfigration clusterConifg, ShadowInitParameters shadowInitParameters, CachedShadowSettings shadowSettings)
         {
+            CubetoOctanShader = resources.CubetoOctanShader;
+            if (CubetoOctanShader)
+                CubetoOctanKernel = CubetoOctanShader.FindKernel("CubetoOctan");
+
             m_ProbeLightManager.Build(resources, clusterConifg, shadowInitParameters, shadowSettings);
             m_ProbeLightManager.AllocateResolutionDependentResources((int)PROBE_RES, (int)PROBE_RES, clusterConifg);
             m_ShadowSettings = shadowSettings;
@@ -350,7 +395,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                     }
                 }
                 
-                ReprojectCubeToOctan();
+                ReprojectCubeToOctan(renderContext, cmd);
 
                 UnityEngine.Object.DestroyImmediate(probeCamera);
                 UnityEngine.Object.DestroyImmediate(probeCamObj);
@@ -415,9 +460,26 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
         }
 
-        private void ReprojectCubeToOctan()
+        private void ReprojectCubeToOctan(ScriptableRenderContext renderContext, CommandBuffer cmd)
         {
+            if (CubetoOctanShader && CubetoOctanKernel >= 0)
+            {
+                cmd.Clear();
+                cmd.SetComputeTextureParam(CubetoOctanShader, CubetoOctanKernel, "GI_ProbeTexture", radianceCubeArray);
+                cmd.SetComputeTextureParam(CubetoOctanShader, CubetoOctanKernel, "GI_NormalTexture", normalMapArray);
+                cmd.SetComputeTextureParam(CubetoOctanShader, CubetoOctanKernel, "GI_DepthTexture", depthMapArray);
 
+                cmd.SetComputeTextureParam(CubetoOctanShader, CubetoOctanKernel, "RadMapOctan", radianceMapOctan);
+                cmd.SetComputeTextureParam(CubetoOctanShader, CubetoOctanKernel, "NormalMapOctan", normalMapOctan);
+                cmd.SetComputeTextureParam(CubetoOctanShader, CubetoOctanKernel, "DistMapOctan", depthMapOctan);
+
+                cmd.SetComputeVectorParam(CubetoOctanShader, "CubeOctanResolution", new Vector4(PROBE_RES, PROBE_RES, PROBE_RES, PROBE_RES));
+                int threadDim = PROBE_RES / 8;
+                cmd.DispatchCompute(CubetoOctanShader, CubetoOctanKernel, threadDim, threadDim, Probes.Count);
+                renderContext.ExecuteCommandBuffer(cmd);
+                renderContext.Submit();
+                cmd.Clear();
+            }
         }
 
         public void PushGlobalParams(CommandBuffer cmd)
@@ -427,6 +489,11 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                 cmd.SetGlobalTexture("GI_ProbeTexture", radianceCubeArray);
                 cmd.SetGlobalTexture("GI_NormalTexture", normalMapArray);
                 cmd.SetGlobalTexture("GI_DepthTexture", depthMapArray);
+
+                cmd.SetGlobalTexture("RadMapOctan", radianceMapOctan);
+                cmd.SetGlobalTexture("NormalMapOctan", normalMapOctan);
+                cmd.SetGlobalTexture("DistMapOctan", depthMapOctan);
+
                 cmd.SetGlobalFloat("GI_DebugMode", (float)debugMode);
                 cmd.SetGlobalVector("ProbeDimenson", ProbeVolumeDimension);
                 int count = (int)ProbeVolumeDimension.x * (int)ProbeVolumeDimension.y * (int)ProbeVolumeDimension.z;
@@ -450,6 +517,9 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
             radianceCubeArray.Release();
             probeDepth.Release();
             normalMapArray.Release();
+            radianceMapOctan.Release();
+            normalMapOctan.Release();
+            depthMapOctan.Release();
         }
     }
 }

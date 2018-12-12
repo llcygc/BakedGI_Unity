@@ -17,6 +17,7 @@
 			
 			//#include "UnityCG.cginc"
 			#include "CoreRP/ShaderLibrary/Common.hlsl"
+			#include "Octahedral.hlsl"
 
 			TEXTURECUBE_ARRAY(GI_ProbeTexture);
 			SAMPLER(sampler_GI_ProbeTexture);
@@ -26,6 +27,15 @@
 
 			TEXTURECUBE_ARRAY(GI_DepthTexture);
 			SAMPLER(sampler_GI_DepthTexture);
+
+			TEXTURE2D_ARRAY(RadMapOctan);
+			SAMPLER(sampler_RadMapOctan);
+
+			TEXTURE2D_ARRAY(DistMapOctan);
+			SAMPLER(sampler_DistMapOctan);
+
+			TEXTURE2D_ARRAY(NormalMapOctan);
+			SAMPLER(sampler_NormalMapOctan);
 
 			float _ProbeID;
 			float GI_DebugMode;
@@ -66,16 +76,33 @@
 				return coord / ProbeDimenson;
 			}
 
+			half3 SampleProbeColor_Cube(float3 dir)
+			{
+				if (GI_DebugMode == 0)
+					return SAMPLE_TEXTURECUBE_ARRAY(GI_ProbeTexture, sampler_GI_ProbeTexture, dir, _ProbeID);
+				else if (GI_DebugMode == 1)
+					return SAMPLE_TEXTURECUBE_ARRAY(GI_NormalTexture, sampler_GI_NormalTexture, dir, _ProbeID);
+				else
+					return SAMPLE_TEXTURECUBE_ARRAY(GI_DepthTexture, sampler_GI_DepthTexture, dir, _ProbeID).rrr;
+			}
+
+			half3 SampleProbeColor_Octan(float3 dir)
+			{
+				float2 uv = octEncode(dir);
+				uv = uv * 0.5 + 0.5;
+				if (GI_DebugMode == 0)
+					return SAMPLE_TEXTURE2D_ARRAY(RadMapOctan, sampler_RadMapOctan, uv, _ProbeID);
+				else if (GI_DebugMode == 1)
+					return SAMPLE_TEXTURE2D_ARRAY(NormalMapOctan, sampler_NormalMapOctan, uv, _ProbeID);
+				else
+					return SAMPLE_TEXTURE2D_ARRAY(DistMapOctan, sampler_DistMapOctan, uv, _ProbeID).rrr;
+			}
+
 			half3 frag(v2f i) : SV_Target
 			{
 				// sample the texture
 				//return IndexToCoord(_ProbeID);
-				if (GI_DebugMode == 0)
-					return SAMPLE_TEXTURECUBE_ARRAY(GI_ProbeTexture, sampler_GI_ProbeTexture, i.uv, _ProbeID);
-				else if (GI_DebugMode == 1)
-					return SAMPLE_TEXTURECUBE_ARRAY(GI_NormalTexture, sampler_GI_NormalTexture, i.uv, _ProbeID);
-				else
-					return SAMPLE_TEXTURECUBE_ARRAY(GI_DepthTexture, sampler_GI_DepthTexture, i.uv, _ProbeID).rrr;
+				return SampleProbeColor_Octan(normalize(i.uv)); //normalize(i.uv);//
 			}
 			ENDCG
 		}

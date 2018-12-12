@@ -93,6 +93,8 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
         public Shader stencilMaskBlit;
         public Texture2D stencilMaskTexture;
 
+        public ComputeShader CubetoOctanShader;
+
         public int applyDistortionKernel { get; private set; }
 
 #if UNITY_EDITOR
