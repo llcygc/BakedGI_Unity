@@ -1,5 +1,77 @@
 #include "GI_Data.hlsl"
 
+TEXTURE2D_ARRAY(RadMapOctan);
+TEXTURE2D_ARRAY(DistMapOctan);
+TEXTURE2D_ARRAY(NormalMapOctan);
+
+//TRACE_HIT 0
+//TRACE_MISS 1
+//TRACE_UNKNONW 2
+uint TraceSingleProbe(uint index, float3 worldPos, float3 dir, out half3 radColor)
+{
+    ProbeData pData = ProbeDataBuffer[index];
+    float3 localPos = worldPos - pData.position;
+
+    float boundaryTs[5];
+
+    boundaryTs[0] = 0.0f;
+
+    float3 t = localPos * -(1.0f / dir);
+    sort(t);
+
+    for (int i = 0; i < 3; ++i)
+    {
+        boundaryTs[i + 1] = clamp(t[i], 0.0f, 1000.0f);
+    }
+
+    boundaryTs[4] = 1000.0f;
+
+    const float degenerateEpsilon = 0.001f;
+
+    for (int i = 0; i < 4; i++)
+    {
+        float t0 = boundaryTs[i];
+        float t1 = boundaryTs[i + 1];
+        if (abs(t0 - t1) >= degenerateEpsilon)
+        {
+            float3 startPoint = localPos + dir * (t0 + rayBumpEpsilon);
+            float3 endPoint = localPos + dir * (t1 + rayBumpEpsilon);
+
+            if (sqrLength(startPoint) < 0.001)
+                startPoint = dir;
+
+            float2 startUV = octEncode(normalize(startPoint)) * 0.5 + 0.5;
+            float2 endUV = octEncode(normalize(endPoint)) * 0.5 + 0.5;
+
+            float2 startCoord = startUV * CubeOctanResolution.x;
+            float2 endCoord = endUV * CubeOctanResolution.x;
+
+            endCoord += sqrLength(startCoord - endCoord) > 0.0001 ? 0.01 : 0.0;
+            float2 delta = endCoord - startCoord;
+            float2 traceDir = normalize(delta);
+            float dist = length(delta);
+
+            float traceStep = dist / max(abs(delta.x), abs(delta.y));
+
+            float2 currentCoord = startCoord;
+            float traceDist = 0;
+            while (traceDist < dist)
+            {
+                int2 currentCoord = (int2) floor(startCoord + traceDir * traceDist);
+                float sceneDist = LOAD_TEXTURE2D_ARRAY(DistMapOctan, currentCoord, index);
+
+                float2 currentUV = currentCoord / CubeOctanResolution.xy;
+                float3 currentDir = octDecode(currentUV * 2.0 - 1.0);
+
+                float currentRayDist = distanceToIntersection(worldPos, dir, currentDir);
+            }
+        }
+    }
+
+    radColor += 0;
+    return TRACE_MISS;
+}
+
 half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 tangent, half3 binormal, half3 viewDirectionWS, float3 worldPos)
 {
 	uint4 indices1 = 0;
