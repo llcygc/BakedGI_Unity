@@ -176,18 +176,43 @@ inline float sqrLength(float3 vec)
 	return dot(vec, vec);
 }
 
+
+inline float sqrLength(float2 vec)
+{
+	return dot(vec, vec);
+}
+
+/** Returns the distance along v from the origin to the intersection
+with ray R (which it is assumed to intersect) */
+float distanceToIntersection(in float3 origin, in float3 dir, in float3 v) {
+	float numer;
+	float denom = v.y * dir.z - v.z * dir.y;
+
+	if (abs(denom) > 0.1) {
+		numer = origin.y * dir.z - origin.z * dir.y;
+	}
+	else {
+		// We're in the yz plane; use another one
+		numer = origin.x * dir.y - origin.y * dir.x;
+		denom = v.x * dir.y - v.y * dir.x;
+	}
+
+	return numer / denom;
+}
+
 //TRACE_HIT 0
 //TRACE_MISS 1
 //TRACE_UNKNONW 2
 uint TraceSingleProbe(uint index, float3 worldPos, float3 dir, out half3 radColor)
 {    
     ProbeData pData = ProbeDataBuffer[index];
+	float3 localPos = worldPos - pData.position;
 
 	float boundaryTs[5];
 
 	boundaryTs[0] = 0.0f;
 
-	float3 t = worldPos * -(1.0f / dir);
+	float3 t = localPos * -(1.0f / dir);
 	sort(t);
 
 	for (int i = 0; i < 3; ++i)
@@ -205,16 +230,37 @@ uint TraceSingleProbe(uint index, float3 worldPos, float3 dir, out half3 radColo
 		float t1 = boundaryTs[i + 1];
 		if (abs(t0 - t1) >= degenerateEpsilon)
 		{
-			float3 startPoint = worldPos + dir * (t0 + rayBumpEpsilon);
-			float3 endPoint = worldPos + dir * (t1 + rayBumpEpsilon);
+			float3 startPoint = localPos + dir * (t0 + rayBumpEpsilon);
+			float3 endPoint = localPos + dir * (t1 + rayBumpEpsilon);
 
 			if (sqrLength(startPoint) < 0.001)
 				startPoint = dir;
 
-			float2 startCoord = octEncode(normalize(startPoint)) * 0.5 + 0.5;
-			float2 endCoord = octEncode(normalize(endPoint)) * 0.5 + 0.5;
+			float2 startUV = octEncode(normalize(startPoint)) * 0.5 + 0.5;
+			float2 endUV = octEncode(normalize(endPoint)) * 0.5 + 0.5;
 
+			float2 startCoord = startUV * CubeOctanResolution.x;
+			float2 endCoord = endUV * CubeOctanResolution.x;
 
+			endCoord += sqrLength(startCoord - endCoord) > 0.0001 ? 0.01 : 0.0;
+			float2 delta = endCoord - startCoord;
+			float2 traceDir = normalize(delta);
+			float dist = length(delta);
+
+			float traceStep = dist / max(abs(delta.x), abs(delta.y));
+
+			float2 currentCoord = startCoord;
+			float traceDist = 0;
+			while (traceDist < dist)
+			{
+				int2 currentCoord = (int2)floor(startCoord + traceDir * traceDist);
+				float sceneDist = LOAD_TEXTURE2D_ARRAY(DistMapOctan, sampler_DistMapOctan, currentCoord, index);
+
+				float2 currentUV = currentCoord / CubeOctanResolution.xy;
+				float3 currentDir = octDecode(currentUV * 2.0 - 1.0);
+
+				float currentRayDist = distanceToIntersection()
+			}
 		}
 	}
 

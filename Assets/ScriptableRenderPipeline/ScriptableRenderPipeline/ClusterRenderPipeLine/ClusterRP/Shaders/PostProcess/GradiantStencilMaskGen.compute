@@ -21,7 +21,7 @@ void GradiantStencilMaskGen(uint3 globalIdx : SV_DispatchThreadID, uint3 localId
             zoneIndex = 1;
         else if (length <= 0.5625)
             zoneIndex = 2;
-        else if (length < 1.0)
+        else if (length < 1.1)
             zoneIndex = 3;
         else
             zoneIndex = 4;
