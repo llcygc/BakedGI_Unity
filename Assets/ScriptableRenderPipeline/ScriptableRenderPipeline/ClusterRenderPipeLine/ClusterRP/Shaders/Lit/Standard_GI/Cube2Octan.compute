@@ -1,5 +1,4 @@
 ﻿#include "CoreRP/ShaderLibrary/Common.hlsl"
-#include "Octahedral.hlsl"
 #include "GI_Data.hlsl"
 
 RW_TEXTURE2D_ARRAY(half3, RadMapOctan);

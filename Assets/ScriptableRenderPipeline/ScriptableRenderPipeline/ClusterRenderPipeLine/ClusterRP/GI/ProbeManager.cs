@@ -502,6 +502,8 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                 cmd.SetGlobalBuffer("ProbeDataBuffer", ProbeDataBuffer);
                 cmd.SetGlobalMatrixArray("ProbeRotationMatrix", RotationMatrices);
                 cmd.SetGlobalMatrix("ProbeProjMatrix", ProjectionMatrix);
+                cmd.SetGlobalVector("CubeOctanResolution", new Vector4(PROBE_RES, PROBE_RES, PROBE_RES, PROBE_RES));
+                cmd.SetGlobalVector("ProbeProjectonParam", new Vector4(NearPlane, FarPlane, 0, 0));
             }
         }
 

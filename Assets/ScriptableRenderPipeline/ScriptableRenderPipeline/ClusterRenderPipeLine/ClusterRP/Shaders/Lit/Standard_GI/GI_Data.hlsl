@@ -1,3 +1,4 @@
+#include "Octahedral.hlsl"
 
 #define SAMPLE_COUNT 64
 #define SAMPLE_DIM 8
@@ -20,7 +21,7 @@ float4 ProbeMax;
 float4x4 ProbeProjMatrix;
 float4x4 ProbeRotationMatrix[6];
 float4 CubeOctanResolution;
-float4 ProjectonParam;
+float4 ProbeProjectonParam;
 CBUFFER_END
 
 const float rayBumpEpsilon = 0.001; // meters
