@@ -4,13 +4,6 @@ TEXTURE2D_ARRAY(RadMapOctan);
 TEXTURE2D_ARRAY(DistMapOctan);
 TEXTURE2D_ARRAY(NormalMapOctan);
 
-#define RED half3(1, 0, 0)
-#define GREEN half3(0, 1, 0)
-#define BLUE half3(0, 0, 1)
-
-const float minThickness = 0.03; // meters
-const float maxThickness = 0.50; // meters
-
 //TRACE_HIT 0
 //TRACE_MISS 1
 //TRACE_UNKNONW 2
@@ -110,7 +103,7 @@ uint TraceSingleProbe(uint index, float3 worldPos, float3 dir, inout float tMin,
                                         
                     if ((minRayDist < sceneDist/* + surfaceThickness*/) /*&& (dot(normal, dir) < 0)*/)
                     {
-                        debugColor = maxRayDist / ProbeProjectonParam.y; //half3(currentUV, 0);
+						debugColor = sceneDist / ProbeProjectonParam.y; //half3(currentUV, 0);
                         // Two-sided hit
                         // Use the probe's measure of the point instead of the ray distance, since
                         // the probe is more accurate (floating point precision vs. ray march iteration/oct resolution)
@@ -121,6 +114,7 @@ uint TraceSingleProbe(uint index, float3 worldPos, float3 dir, inout float tMin,
                     }
                     else
                     {
+						debugColor = RED;
                         // "Unknown" case. The ray passed completely behind a surface. This should trigger moving to another
                         // probe and is distinguished from "I successfully traced to infinity"
                 
@@ -190,7 +184,7 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 
         uint hitIndex;
         
-        for (uint j = 0; j < 8; j++)
+        for (uint j = 0; j <8; j++)
         {
             hitIndex = indices[j];
             result = TraceSingleProbe(indices[j], worldPos, dir, tMin, tMax, hitUV, normal, debugColor);
@@ -199,10 +193,13 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
                 break;
         }
 
-        if (result == TRACE_HIT)
+        //if (result == TRACE_HIT)
         {
             color += debugColor;//LOAD_TEXTURE2D_ARRAY(RadMapOctan, hitUV * CubeOctanResolution.xy, hitIndex);
         }
+
+		if (result == TRACE_MISS)
+			color = PURPLE;
         
         //uint destIndex = indices[1];
         //ProbeData pData = ProbeDataBuffer[destIndex];

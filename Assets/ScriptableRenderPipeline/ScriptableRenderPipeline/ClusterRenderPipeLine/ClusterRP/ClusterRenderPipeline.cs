@@ -331,6 +331,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                 RTHandles.Release(m_CameraDepthBufferCopy);
 
             SupportedRenderingFeatures.active = new SupportedRenderingFeatures();
+            ProbeManager.instance.Dispose();
         }
 
         bool IsSupportedPlatform()

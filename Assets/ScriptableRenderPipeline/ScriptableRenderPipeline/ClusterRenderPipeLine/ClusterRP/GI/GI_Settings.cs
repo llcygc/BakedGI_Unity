@@ -1,8 +1,14 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+
+#if UNITY_EDITOR
+using UnityEditor;
+using UnityEditor.Experimental.Rendering.ClusterPipeline;
+#endif
 namespace Viva.Rendering.RenderGraph.ClusterPipeline
 {
+    [ExecuteInEditMode]
     public class GI_Settings : MonoBehaviour
     {
         public enum ProbeDebugMode
@@ -34,6 +40,11 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
         void Update()
         {
 
+        }
+
+        private void OnDisable()
+        {
+            ProbeManager.instance.Dispose();
         }
 
         public void AllocateProbes()
@@ -70,6 +81,29 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                             }
                 }
             }
+
+            ProbeManager.instance.SetUpDebug(Vector3.zero, Vector3.zero, false);
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            Camera cam = Camera.current;
+            RaycastHit hit;
+
+            Vector3 mousePosition = Event.current.mousePosition;
+            mousePosition.y = SceneView.currentDrawingSceneView.camera.pixelHeight - mousePosition.y;
+
+            Ray ray = cam.ScreenPointToRay(mousePosition);
+            if (Physics.Raycast(ray, out hit, 1000.0f))
+            {
+                Handles.color = Color.green;
+                Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
+                Handles.DrawLine(hit.point + hit.normal * 2.0f, hit.point);
+                Handles.DrawWireDisc(hit.point, hit.normal, 0.5f);
+                ProbeManager.instance.SetUpDebug(hit.point, hit.normal, true);
+            }
+            else
+                ProbeManager.instance.SetUpDebug(Vector3.zero, Vector3.zero, false);
         }
 
 #endif

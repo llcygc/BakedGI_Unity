@@ -7,6 +7,17 @@
 #define TRACE_MISS 1
 #define TRACE_UNKNONW 2
 
+
+#define RED half3(1, 0, 0)
+#define GREEN half3(0, 1, 0)
+#define BLUE half3(0, 0, 1)
+#define PURPLE half3(1, 0, 1)
+#define YELLOW half3(1, 1, 0)
+#define ORANGE half3(1, 0.5, 0)
+
+const float minThickness = 0.03; // meters
+const float maxThickness = 0.50; // meters
+
 struct ProbeData
 {
 	float3 position;

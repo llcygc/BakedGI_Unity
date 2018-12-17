@@ -59,6 +59,9 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
         private float FarPlane = 1000.0f;
         private ComputeShader CubetoOctanShader;
         private int CubetoOctanKernel;
+        private Vector3 debugPos;
+        private Vector3 debugDir;
+        private bool doDebugTrace = false;
 
         ComputeBuffer ProbeDataBuffer;
 
@@ -203,7 +206,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                                 if (mesh)
                                 {
                                     Material probeMat = new Material(ProbeDebugShader);
-                                    probeMat.SetFloat("_ProbeID", index);
+                                    probeMat.SetFloat("_DebugProbeID", index);
                                     mesh.sharedMaterial = probeMat;
                                 }
                                 debugSphere.SetActive(showDebug);
@@ -214,7 +217,11 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                             {
                                 Probes[index].position = coord;
                                 Probes[index].probeID = new Vector4(i, j, k, 0);
-                                if (DebugSpheres[index] == null)
+                                if (DebugSpheres.Count < i + 1)
+                                {
+                                    DebugSpheres.Add(GameObject.CreatePrimitive(PrimitiveType.Sphere));
+                                }
+                                else if (DebugSpheres[index] == null)
                                 {
                                     DebugSpheres[index] = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                                 }
@@ -223,7 +230,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                                 if (mesh)
                                 {
                                     Material probeMat = mesh.sharedMaterial;
-                                    if (probeMat.shader.name != "Unlit / GI_ProbeDebug")
+                                    if (probeMat.shader.name != "Unlit/GI_ProbeDebug")
                                         probeMat = new Material(ProbeDebugShader);
 
                                     probeMat.SetFloat("_ProbeID", index);
@@ -460,6 +467,13 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
         }
 
+        public void SetUpDebug(Vector3 pos, Vector3 dir, bool hasHit)
+        {
+            debugPos = pos;
+            debugDir = dir;
+            doDebugTrace = hasHit;
+        }
+
         private void ReprojectCubeToOctan(ScriptableRenderContext renderContext, CommandBuffer cmd)
         {
             if (CubetoOctanShader && CubetoOctanKernel >= 0)
@@ -504,6 +518,10 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                 cmd.SetGlobalMatrix("ProbeProjMatrix", ProjectionMatrix);
                 cmd.SetGlobalVector("CubeOctanResolution", new Vector4(PROBE_RES, PROBE_RES, PROBE_RES, PROBE_RES));
                 cmd.SetGlobalVector("ProbeProjectonParam", new Vector4(NearPlane, FarPlane, 0, 0));
+
+                cmd.SetGlobalVector("DebugPos", debugPos);
+                cmd.SetGlobalVector("DebugDir", debugDir);
+                cmd.SetGlobalVector("DebugParam", new Vector4(doDebugTrace ? 1 : 0, 1000.0f, 0, 0));
             }
         }
 
