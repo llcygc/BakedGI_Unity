@@ -14,6 +14,8 @@
 #define PURPLE half3(1, 0, 1)
 #define YELLOW half3(1, 1, 0)
 #define ORANGE half3(1, 0.5, 0)
+#define WHITE half3(1, 1, 1)
+#define BLACK half3(0, 0, 0)
 
 const float minThickness = 0.03; // meters
 const float maxThickness = 0.50; // meters
@@ -35,7 +37,7 @@ float4 CubeOctanResolution;
 float4 ProbeProjectonParam;
 CBUFFER_END
 
-const float rayBumpEpsilon = 0.001; // meters
+#define rayBumpEpsilon 0.001f // meters
 
 TEXTURECUBE_ARRAY(GI_ProbeTexture);
 SAMPLER(sampler_GI_ProbeTexture);

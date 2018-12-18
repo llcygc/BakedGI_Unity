@@ -60,7 +60,7 @@ uint TraceSingleProbe(uint index, float3 worldPos, float3 dir, inout float tMin,
             
             float3 dirBefore = octDecode((startUV) * 2.0 - 1.0);
             dirBefore.y *= -1;
-            float distBefore = max(0.0, distanceToIntersection(worldPos, dir, dirBefore));
+            float distBefore = max(0.0, distanceToIntersection(localPos, dir, dirBefore));
 
             float traceDist = 0;
             while (traceDist < dist)
@@ -72,7 +72,7 @@ uint TraceSingleProbe(uint index, float3 worldPos, float3 dir, inout float tMin,
                 float2 afterUV = startUV + traceDir * min(traceDist + traceStep, dist);
                 float3 dirAfter = octDecode(currentUV * 2.0 - 1.0);
                 dirAfter.y *= -1;
-                float distAfter = max(0.0, distanceToIntersection(worldPos, dir, dirAfter));
+                float distAfter = max(0.0, distanceToIntersection(localPos, dir, dirAfter));
 
                 float maxRayDist = max(distBefore, distAfter);
                 if(maxRayDist >= sceneDist)
@@ -101,7 +101,7 @@ uint TraceSingleProbe(uint index, float3 worldPos, float3 dir, inout float tMin,
                     // Scale with distance along the ray
                     clamp(distAlongRay * 0.1, 0.05, 1.0);
                                         
-                    if ((minRayDist < sceneDist/* + surfaceThickness*/) /*&& (dot(normal, dir) < 0)*/)
+                    if ((minRayDist < sceneDist + surfaceThickness) /*&& (dot(normal, dir) < 0)*/)
                     {
 						debugColor = sceneDist / ProbeProjectonParam.y; //half3(currentUV, 0);
                         // Two-sided hit

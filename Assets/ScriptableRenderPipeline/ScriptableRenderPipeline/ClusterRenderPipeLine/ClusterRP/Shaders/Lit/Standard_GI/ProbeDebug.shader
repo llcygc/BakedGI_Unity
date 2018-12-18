@@ -95,7 +95,7 @@
 					if (abs(t0 - t1) >= degenerateEpsilon)
 					{
 						float3 startPoint = localPos + dir * (t0 + rayBumpEpsilon);
-						float3 endPoint = localPos + dir * (t1 + rayBumpEpsilon);
+						float3 endPoint = localPos + dir * (t1 - rayBumpEpsilon);
 
 						if (sqrLength(startPoint) < 0.001)
 							startPoint = dir;
@@ -104,8 +104,7 @@
 						endPoint.y *= -1;
 
 						float2 startUV = octEncode(normalize(startPoint)) * 0.5 + 0.5;
-						float2 endUV = octEncode(normalize(endPoint)) * 0.5 + 0.5;
-
+						float2 endUV = octEncode(normalize(endPoint)) * 0.5 + 0.5;						
 
 						float2 startCoord = startUV * CubeOctanResolution.x;
 						float2 endCoord = endUV * CubeOctanResolution.x;
@@ -119,7 +118,7 @@
 
 						float3 dirBefore = octDecode((startUV) * 2.0 - 1.0);
 						dirBefore.y *= -1;
-						float distBefore = max(0.0, distanceToIntersection(worldPos, dir, dirBefore));
+						float distBefore = max(0.0, distanceToIntersection(localPos, dir, dirBefore));
 
 						float traceDist = 0;
 						while (traceDist < dist)
@@ -131,14 +130,23 @@
 							float2 afterUV = startUV + traceDir * min(traceDist + traceStep, dist);
 							float3 dirAfter = octDecode(currentUV * 2.0 - 1.0);
 							dirAfter.y *= -1;
-							float distAfter = max(0.0, distanceToIntersection(worldPos, dir, dirAfter));
+							float distAfter = max(0.0, distanceToIntersection(localPos, dir, dirAfter));
 
 							float maxRayDist = max(distBefore, distAfter);
 
 							half3 finalColor = 0;
 
-							if (length(uv - currentUV) <= 2 / CubeOctanResolution.x)
-								return colors[i];
+							if (length(uv - currentUV) <= (1 / CubeOctanResolution.x))
+							{
+								float minRayDist = min(distBefore, distAfter);
+								if (maxRayDist >= sceneDist)
+								{
+									if (minRayDist < sceneDist)
+										return WHITE;
+									else 
+										return RED;
+								}
+							}
 
 
 							distBefore = distAfter;
@@ -173,7 +181,6 @@
 				float result = dot(tempDir, normalize(localPos));
 				half3 color = 0;
 				
-				color += TraceSingleProbeDebug((uint)_DebugProbeID, DebugPos, DebugDir, 0.0f, 1000.0f, uv);
 
 				if (GI_DebugMode == 0)
 					color += SAMPLE_TEXTURE2D_ARRAY(RadMapOctan, sampler_RadMapOctan, uv, _DebugProbeID);
@@ -181,6 +188,10 @@
 					color += SAMPLE_TEXTURE2D_ARRAY(NormalMapOctan, sampler_NormalMapOctan, uv, _DebugProbeID);
 				else
 					color += SAMPLE_TEXTURE2D_ARRAY(DistMapOctan, sampler_DistMapOctan, uv, _DebugProbeID).rrr;
+
+				half3 resultColor = TraceSingleProbeDebug((uint)_DebugProbeID, DebugPos, DebugDir, 0.0f, 1000.0f, uv);
+				if(!all(resultColor == 0))
+					color = resultColor;
 				
 
 				return color;
