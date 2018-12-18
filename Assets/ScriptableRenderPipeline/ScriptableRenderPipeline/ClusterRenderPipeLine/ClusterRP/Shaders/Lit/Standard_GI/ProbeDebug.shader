@@ -88,6 +88,14 @@
 
 				const half3 colors[4] = { RED, GREEN, BLUE, ORANGE };
 
+				/*float3 startPointD = localPos;
+				startPointD.y *= -1;
+				float2 startUVD = octEncode(normalize(startPointD)) * 0.5 + 0.5;
+				float2 startCoordD = startUVD * CubeOctanResolution.x;
+				float sceneDistD = LOAD_TEXTURE2D_ARRAY(DistMapOctan, startCoordD, index) * ProbeProjectonParam.y;
+				if (length(uv - startUVD) <= (1 / CubeOctanResolution.x))
+					return length(localPos) / ProbeProjectonParam.y;*/
+
 				for (int i = 0; i < 4; i++)
 				{
 					float t0 = boundaryTs[i];
@@ -135,10 +143,11 @@
 							float maxRayDist = max(distBefore, distAfter);
 
 							half3 finalColor = 0;
-
 							if (length(uv - currentUV) <= (1 / CubeOctanResolution.x))
 							{
+
 								float minRayDist = min(distBefore, distAfter);
+								return distBefore / ProbeProjectonParam.y;
 								if (maxRayDist >= sceneDist)
 								{
 									if (minRayDist < sceneDist)

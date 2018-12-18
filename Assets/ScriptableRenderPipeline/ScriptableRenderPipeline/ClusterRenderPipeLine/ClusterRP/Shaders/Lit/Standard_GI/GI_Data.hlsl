@@ -37,7 +37,7 @@ float4 CubeOctanResolution;
 float4 ProbeProjectonParam;
 CBUFFER_END
 
-#define rayBumpEpsilon 0.001f // meters
+#define rayBumpEpsilon 0.005f // meters
 
 TEXTURECUBE_ARRAY(GI_ProbeTexture);
 SAMPLER(sampler_GI_ProbeTexture);

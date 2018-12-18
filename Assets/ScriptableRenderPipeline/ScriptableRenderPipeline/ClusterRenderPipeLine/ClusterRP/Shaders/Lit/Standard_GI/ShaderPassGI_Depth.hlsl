@@ -84,7 +84,7 @@ half Frag(VertexOutput IN) : SV_Target0
 	LODDitheringTransition(floor(IN.clipPos.xy), unity_LODFade.x);
 #endif
 
-	float linearZ = Linear01Depth(IN.clipPos.z, _ZBufferParams);
+    float linearZ = length(IN.posWS.xyz - _WorldSpaceCameraPos) / ProbeProjectonParam.y; //Linear01Depth(IN.clipPos.z, _ZBufferParams);
 
     return linearZ;
 
