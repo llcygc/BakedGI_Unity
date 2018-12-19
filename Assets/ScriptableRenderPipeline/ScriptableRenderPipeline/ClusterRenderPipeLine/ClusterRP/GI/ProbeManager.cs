@@ -1,4 +1,7 @@
-﻿using System;
+﻿
+#if RGRP_V_RD
+
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -543,3 +546,5 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
         }
     }
 }
+
+#endif

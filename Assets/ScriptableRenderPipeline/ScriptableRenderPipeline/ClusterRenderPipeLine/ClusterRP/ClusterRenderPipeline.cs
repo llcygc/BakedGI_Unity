@@ -230,7 +230,9 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
             }
 
             m_LightManager.Build(asset.renderPipelineResources, m_FrameConfig.clusterConfig, asset.shadowInitParams, m_ShadowSettings);
+#if RGRP_V_RD
             ProbeManager.instance.Build(asset.renderPipelineResources, m_FrameConfig.clusterConfig, asset.shadowInitParams, m_ShadowSettings);
+#endif
             m_SkyManager.Build(asset.renderPipelineResources);
             m_SkyManager.skySettings = skySettingsToUse;
 
@@ -331,7 +333,9 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                 RTHandles.Release(m_CameraDepthBufferCopy);
 
             SupportedRenderingFeatures.active = new SupportedRenderingFeatures();
+#if RGRP_V_RD
             ProbeManager.instance.Dispose();
+#endif
         }
 
         bool IsSupportedPlatform()
@@ -467,7 +471,9 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
             if (!isReflection && cameras.Any(c => c.cameraType != CameraType.Preview))
             {
                 CommandBuffer probeCmd = CommandBufferPool.Get("Probe Rendering");
+#if RGRP_V_RD
                 ProbeManager.instance.Render(renderContext, probeCmd);
+#endif
                 CommandBufferPool.Release(probeCmd);
             }
             //if(!isReflection)
@@ -767,8 +773,9 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 
                     if (rgCam.StereoEnabled)
                         renderContext.StopMultiEye(cam);
-
+#if RGRP_V_RD
                     ProbeManager.instance.PushGlobalParams(cmd);
+#endif
                     RenderForwardOpaque(m_cullResults, rgCam, cam, renderContext, cmd);
 
                     if (rgCam.TaaEnabled)

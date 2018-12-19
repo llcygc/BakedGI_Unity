@@ -1,5 +1,4 @@
 ﻿#if RGRP_V_2
-
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -7,22 +6,26 @@ using UnityEngine.Experimental.Rendering;
 
 namespace Viva.Rendering.RenderGraph
 {
-    public abstract class IRGRenderer
+    public class ComputeNode : IRenderGraphNode
     {
-        public virtual void SetUp()
+        public bool AsyncNode;
+        // Start is called before the first frame update
+        void SetUp()
         {
 
         }
+
         // Update is called once per frame
-        public virtual void Update()
+        void Update()
         {
 
         }
 
-        public virtual void Execute(ScriptableRenderContext renderContext)
+        public override void Execute(ScriptableRenderContext renderContext)
         {
 
         }
     }
 }
+
 #endif
