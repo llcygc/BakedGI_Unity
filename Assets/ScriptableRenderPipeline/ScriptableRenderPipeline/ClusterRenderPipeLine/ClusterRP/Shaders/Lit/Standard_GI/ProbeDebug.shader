@@ -2,7 +2,7 @@
 {
 	Properties
 	{
-		_ProbeID("Probe ID", Int) = 0
+		_DebugProbeID("Probe ID", Int) = 0
 	}
 		SubShader
 	{
@@ -100,7 +100,7 @@
 				{
 					float t0 = boundaryTs[i];
 					float t1 = boundaryTs[i + 1];
-					if (abs(t0 - t1) >= degenerateEpsilon)
+					if (abs(t0 - t1) > degenerateEpsilon)
 					{
 						float3 startPoint = localPos + dir * (t0 + rayBumpEpsilon);
 						float3 endPoint = localPos + dir * (t1 - rayBumpEpsilon);
@@ -116,6 +116,7 @@
 
 						float2 startCoord = startUV * CubeOctanResolution.x;
 						float2 endCoord = endUV * CubeOctanResolution.x;
+						
 
 						endUV += sqrLength(startUV - endUV) > 0.0001 ? 0.01 : 0.0;
 						float2 delta = endUV - startUV;
@@ -126,41 +127,48 @@
 
 						float3 dirBefore = octDecode((startUV) * 2.0 - 1.0);
 						dirBefore.y *= -1;
-						float distBefore = max(0.0, distanceToIntersection(localPos, dir, dirBefore));
+						float distBefore = max(0.0, distanceToIntersectionFix(localPos, dir, dirBefore));
 
 						float traceDist = 0;
+						bool behind = false;
 						while (traceDist < dist)
 						{
 							float2 currentUV = startUV + traceDir * min(traceDist + traceStep * 0.5, dist);
-							int2 currentCoord = (int2) (currentUV * CubeOctanResolution.xy);
-							float sceneDist = LOAD_TEXTURE2D_ARRAY(DistMapOctan, currentCoord, index) * ProbeProjectonParam.y;
-
-							float2 afterUV = startUV + traceDir * min(traceDist + traceStep, dist);
-							float3 dirAfter = octDecode(currentUV * 2.0 - 1.0);
-							dirAfter.y *= -1;
-							float distAfter = max(0.0, distanceToIntersection(localPos, dir, dirAfter));
-
-							float maxRayDist = max(distBefore, distAfter);
-
-							half3 finalColor = 0;
-							if (length(uv - currentUV) <= (1 / CubeOctanResolution.x))
+							if (all(currentUV >= 0) && all(currentUV <= 1))
 							{
+								int2 currentCoord = (int2) (currentUV * CubeOctanResolution.xy);
+								float sceneDist = SAMPLE_TEXTURE2D_ARRAY_LOD(DistMapOctan, sampler_DistMapOctan, currentUV, index, 0) * ProbeProjectonParam.y;
 
-								float minRayDist = min(distBefore, distAfter);
-								return distBefore / ProbeProjectonParam.y;
-								if (maxRayDist >= sceneDist)
+								float2 afterUV = startUV + traceDir * min(traceDist + traceStep, dist);
+								float3 dirAfter = octDecode(currentUV * 2.0 - 1.0);
+								dirAfter.y *= -1;
+								float distAfter = max(0.0, distanceToIntersectionFix(localPos, dir, dirAfter));
+
+								float maxRayDist = max(distBefore, distAfter);
+
+								half3 finalColor = 0;
+								if (length(uv - currentUV) <= (2 / CubeOctanResolution.x))
 								{
-									if (minRayDist < sceneDist)
-										return WHITE;
-									else 
-										return RED;
+									float minRayDist = min(distBefore, distAfter);
+									//return sceneDist / ProbeProjectonParam.y;
+									if (maxRayDist >= sceneDist)
+									{
+										if (minRayDist < sceneDist)
+											return WHITE;
+										else
+										{
+											return RED;
+										}
+									}
+									//else return tempColor;
 								}
+
+
+								distBefore = distAfter;
+								traceDist += traceStep;
 							}
-
-
-							distBefore = distAfter;
-							dirBefore = dirAfter;
-							traceDist += traceStep;
+							else
+								break;
 						}
 					}
 				}
@@ -183,11 +191,6 @@
 				float2 uv = octEncode(dir);
 				uv = uv * 0.5 + 0.5;
 				
-				float3 vertDir = dir;
-				vertDir.y *= -1;
-				float3 localPos = DebugPos - ProbeDataBuffer[(int)_DebugProbeID].position;
-				float3 tempDir = cross(DebugDir, vertDir);
-				float result = dot(tempDir, normalize(localPos));
 				half3 color = 0;
 				
 
@@ -198,9 +201,14 @@
 				else
 					color += SAMPLE_TEXTURE2D_ARRAY(DistMapOctan, sampler_DistMapOctan, uv, _DebugProbeID).rrr;
 
-				half3 resultColor = TraceSingleProbeDebug((uint)_DebugProbeID, DebugPos, DebugDir, 0.0f, 1000.0f, uv);
-				if(!all(resultColor == 0))
-					color = resultColor;
+				//color = half3(uv, 0);
+				//color = IndexToCoord(_DebugProbeID);
+
+				//Trace line debug
+				//half3 resultColor = TraceSingleProbeDebug((uint)_DebugProbeID, DebugPos, DebugDir, 0.0f, 1000.0f, uv);
+
+				/*if(!all(resultColor == 0))
+					color = resultColor;*/
 				
 
 				return color;
@@ -209,7 +217,7 @@
 			half3 frag(v2f i) : SV_Target
 			{
 				// sample the texture
-				//return IndexToCoord(_ProbeID);
+				//return IndexToCoord(_DebugProbeID);
 				return SampleProbeColor_Octan(normalize(i.uv)); //normalize(i.uv);//
 			}
 			ENDCG

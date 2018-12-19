@@ -113,6 +113,8 @@ half4 Frag(VertexOutput IN) : SV_Target0
 #endif
 	float linearZ = Linear01Depth(IN.clipPos.z, _ZBufferParams);
 
-    return half4(inputData.normalWS.xyz, linearZ);
+	float2 normalOcta = octEncode(inputData.normalWS.xyz) * 0.5 + 0.5;
+
+    return half4(normalOcta.xy, 0, 0);
 
 }

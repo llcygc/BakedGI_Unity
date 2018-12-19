@@ -213,3 +213,23 @@ float distanceToIntersection(in float3 origin, in float3 dir, in float3 v) {
 
 	return numer / denom;
 }
+
+float distanceToIntersectionFix(in float3 origin, in float3 dir, in float3 v) {
+	float3 e = v;
+	float3 f = dir;
+	float3 g = origin;
+
+	float3 H = cross(f, g);
+	float3 K = cross(f, e);
+
+	float h = length(H);
+	float k = length(K);
+
+	float result = h / k;
+
+	if (dot(H, K) <= 0)
+		result *= -1;
+
+	return max(0, result);
+	
+}

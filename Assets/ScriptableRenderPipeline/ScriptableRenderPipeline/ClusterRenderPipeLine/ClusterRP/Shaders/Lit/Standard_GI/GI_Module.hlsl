@@ -1,8 +1,13 @@
 #include "GI_Data.hlsl"
 
 TEXTURE2D_ARRAY(RadMapOctan);
+SAMPLER(sampler_RadMapOctan);
+
 TEXTURE2D_ARRAY(DistMapOctan);
+SAMPLER(sampler_DistMapOctan);
+
 TEXTURE2D_ARRAY(NormalMapOctan);
+SAMPLER(sampler_NormalMapOctan);
 
 //TRACE_HIT 0
 //TRACE_MISS 1
@@ -36,7 +41,7 @@ uint TraceSingleProbe(uint index, float3 worldPos, float3 dir, inout float tMin,
         if (abs(t0 - t1) >= degenerateEpsilon)
         {
             float3 startPoint = localPos + dir * (t0 + rayBumpEpsilon);
-            float3 endPoint = localPos + dir * (t1 + rayBumpEpsilon);
+            float3 endPoint = localPos + dir * (t1 - rayBumpEpsilon);
 
             if (sqrLength(startPoint) < 0.001)
                 startPoint = dir;
@@ -45,95 +50,105 @@ uint TraceSingleProbe(uint index, float3 worldPos, float3 dir, inout float tMin,
             endPoint.y *= -1;
 
             float2 startUV = octEncode(normalize(startPoint)) * 0.5 + 0.5;
-            float2 endUV = octEncode(normalize(endPoint)) * 0.5 + 0.5;
-            
+            float2 endUV = octEncode(normalize(endPoint)) * 0.5 + 0.5;            
 
             float2 startCoord = startUV * CubeOctanResolution.x;
             float2 endCoord = endUV * CubeOctanResolution.x;
 
             endUV += sqrLength(startUV - endUV) > 0.0001 ? 0.01 : 0.0;
             float2 delta = endUV - startUV;
-            float2 traceDir = normalize(delta);
+			float2 traceDir = normalize(delta);
             float dist = length(delta);
 
             float traceStep = dist / max(abs(delta.x * CubeOctanResolution.x), abs(delta.y * CubeOctanResolution.y));
             
             float3 dirBefore = octDecode((startUV) * 2.0 - 1.0);
             dirBefore.y *= -1;
-            float distBefore = max(0.0, distanceToIntersection(localPos, dir, dirBefore));
+            float distBefore = max(0.0, distanceToIntersectionFix(localPos, dir, dirBefore));
 
             float traceDist = 0;
             while (traceDist < dist)
             {                
-                float2 currentUV = startUV + traceDir * min(traceDist + traceStep * 0.5, dist);
-                int2 currentCoord = (int2) (currentUV * CubeOctanResolution.xy);
-                float sceneDist = LOAD_TEXTURE2D_ARRAY(DistMapOctan, currentCoord, index) * ProbeProjectonParam.y;
-                                
-                float2 afterUV = startUV + traceDir * min(traceDist + traceStep, dist);
-                float3 dirAfter = octDecode(currentUV * 2.0 - 1.0);
-                dirAfter.y *= -1;
-                float distAfter = max(0.0, distanceToIntersection(localPos, dir, dirAfter));
+                float2 currentUV = saturate(startUV + traceDir * min(traceDist + traceStep * 0.5, dist));
+				if (all(currentUV >= 0) && all(currentUV <= 1))
+				{
+					int2 currentCoord = (int2) (currentUV * CubeOctanResolution.xy);
+					float sceneDist = SAMPLE_TEXTURE2D_ARRAY_LOD(DistMapOctan, sampler_DistMapOctan, currentUV, index, 0) * ProbeProjectonParam.y;
 
-                float maxRayDist = max(distBefore, distAfter);
-                if(maxRayDist >= sceneDist)
-                {                
-                    float minRayDist = min(distBefore, distAfter);
-                    
-                    float distanceFromProbeToRay = (minRayDist + maxRayDist) * 0.5;                    
-                    float3 directionFromProbe = octDecode(currentUV * 2.0 - 1.0);
-                    directionFromProbe.y *= -1;
+					float2 afterUV = startUV + traceDir * min(traceDist + traceStep, dist);
+					float3 dirAfter = octDecode(currentUV * 2.0 - 1.0);
+					dirAfter.y *= -1;
+					float distAfter = max(0.0, distanceToIntersectionFix(localPos, dir, dirAfter));
 
-                    float3 probeSpaceHitPoint = sceneDist * directionFromProbe;
-                    float distAlongRay = dot(probeSpaceHitPoint - worldPos, dir);
+					float maxRayDist = max(distBefore, distAfter);
 
-                    float3 normal = LOAD_TEXTURE2D_ARRAY(NormalMapOctan, currentCoord, index);
-                    // Only extrude towards and away from the view ray, not perpendicular to it
-                    // Don't allow extrusion TOWARDS the viewer, only away
-                    float surfaceThickness = minThickness
-                    + (maxThickness - minThickness) *
+					if (maxRayDist >= sceneDist)
+					{
 
-                    // Alignment of probe and view ray
-                    max(dot(dir, directionFromProbe), 0.0) *
+						float minRayDist = min(distBefore, distAfter);
 
-                    // Alignment of probe and normal (glancing surfaces are assumed to be thicker because they extend into the pixel)
-                    (2 - abs(dot(dir, normal))) *
+						float distanceFromProbeToRay = (minRayDist + maxRayDist) * 0.5;
+						float3 directionFromProbe = octDecode(currentUV * 2.0 - 1.0);
+						directionFromProbe.y *= -1;
 
-                    // Scale with distance along the ray
-                    clamp(distAlongRay * 0.1, 0.05, 1.0);
-                                        
-                    if ((minRayDist < sceneDist + surfaceThickness) /*&& (dot(normal, dir) < 0)*/)
-                    {
-						debugColor = sceneDist / ProbeProjectonParam.y; //half3(currentUV, 0);
-                        // Two-sided hit
-                        // Use the probe's measure of the point instead of the ray distance, since
-                        // the probe is more accurate (floating point precision vs. ray march iteration/oct resolution)
-                        tMax = distAlongRay;
-                        hitUV = currentUV;
-                        hitNormal = normal;
-                        return TRACE_HIT;
-                    }
-                    else
-                    {
-						debugColor = RED;
-                        // "Unknown" case. The ray passed completely behind a surface. This should trigger moving to another
-                        // probe and is distinguished from "I successfully traced to infinity"
-                
-                        // Back up conservatively so that we don't set tMin too large
-                        float3 probeSpaceHitPointBefore = distBefore * dirBefore;
-                        float distAlongRayBefore = dot(probeSpaceHitPointBefore - worldPos, dir);
-                
-                        // Max in order to disallow backing up along the ray (say if beginning of this texel is before tMin from probe switch)
-                        // distAlongRayBefore in order to prevent overstepping
-                        // min because sometimes distAlongRayBefore > distAlongRay
-                        tMin = max(tMin, min(distAlongRay, distAlongRayBefore));
+						float3 probeSpaceHitPoint = sceneDist * directionFromProbe;
+						float distAlongRay = dot(probeSpaceHitPoint - localPos, dir);
 
-                        return TRACE_UNKNONW;
-                    }
-                }
+						float2 normalOcta = LOAD_TEXTURE2D_ARRAY(NormalMapOctan, currentCoord, index).xy;
+						float3 normal = octDecode(normalOcta * 2.0 - 1.0);
+						// Only extrude towards and away from the view ray, not perpendicular to it
+						// Don't allow extrusion TOWARDS the viewer, only away
+						float surfaceThickness = minThickness
+							+ (maxThickness - minThickness) *
 
-                distBefore = distAfter;
-                dirBefore = dirAfter;
-                traceDist += traceStep;
+							// Alignment of probe and view ray
+							max(dot(dir, directionFromProbe), 0.0) *
+
+							// Alignment of probe and normal (glancing surfaces are assumed to be thicker because they extend into the pixel)
+							(2 - abs(dot(dir, normal))) *
+
+							// Scale with distance along the ray
+							clamp(distAlongRay * 0.1, 0.05, 1.0);
+
+						if ((minRayDist < sceneDist + surfaceThickness) && (dot(normal, dir) < 0))
+						{
+							//debugColor = BLUE;// any(normal < half3(0, 0, 0)) ? BLUE : BLACK;// dot(normal, dir); //half3(currentUV, 0);
+							// Two-sided hit
+							// Use the probe's measure of the point instead of the ray distance, since
+							// the probe is more accurate (floating point precision vs. ray march iteration/oct resolution)
+							tMax = distAlongRay;
+							hitUV = currentUV;
+							hitNormal = normal;
+							return TRACE_HIT;
+						}
+						else
+						{
+							debugColor = RED;
+							hitUV = 0;
+							// "Unknown" case. The ray passed completely behind a surface. This should trigger moving to another
+							// probe and is distinguished from "I successfully traced to infinity"
+
+							// Back up conservatively so that we don't set tMin too large
+							float3 probeSpaceHitPointBefore = distBefore * dirBefore;
+							float distAlongRayBefore = dot(probeSpaceHitPointBefore - localPos, dir);
+
+							// Max in order to disallow backing up along the ray (say if beginning of this texel is before tMin from probe switch)
+							// distAlongRayBefore in order to prevent overstepping
+							// min because sometimes distAlongRayBefore > distAlongRay
+							tMin = max(tMin, min(distAlongRay, distAlongRayBefore));
+
+							return TRACE_UNKNONW;
+						}
+					}
+
+					distBefore = distAfter;
+					traceDist += traceStep;
+				}
+				else
+				{
+					hitUV = 0;
+					break;
+				}
             }
         }
     }
@@ -153,20 +168,22 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 
 	int count = 0;
 	float step = 0.5f;
-    for (int i = 0; i < 1/*SAMPLE_COUNT*/; i++)
+    for (int i = 0; i < SAMPLE_COUNT; i++)
 	{
 		float divX = floor(i / SAMPLE_DIM) + 1;
 		float divY = i % SAMPLE_DIM + 1;
 		float theta = 2 * PI * (divX / (SAMPLE_DIM + 1));
-		float phi = 0.5 * PI * (divY / (SAMPLE_DIM + 1));
+		float phi = 0.25 * PI * (divY / (SAMPLE_DIM + 1));
 
 		float x = sin(phi) * cos(theta);
 		float y = sin(phi) * sin(theta);
 		float z = cos(phi);
 
-		float3 dir = normalWS/* * z + binormal * y + tangent * x*/;
+		float3 dir = normalWS * z + binormal * y + tangent * x;
         half3 skyColor;
-        
+
+		worldPos += dir * rayBumpEpsilon;
+
         SortProbes(worldPos, dir, indices);
         
         //TRACE_HIT 0
@@ -184,7 +201,7 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 
         uint hitIndex;
         
-        for (uint j = 0; j <8; j++)
+        for (uint j = 0; j < 8; j++)
         {
             hitIndex = indices[j];
             result = TraceSingleProbe(indices[j], worldPos, dir, tMin, tMax, hitUV, normal, debugColor);
@@ -193,13 +210,15 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
                 break;
         }
 
-        //if (result == TRACE_HIT)
+        if (result == TRACE_HIT)
         {
-            color += debugColor;//LOAD_TEXTURE2D_ARRAY(RadMapOctan, hitUV * CubeOctanResolution.xy, hitIndex);
+			half3 hitColor= LOAD_TEXTURE2D_ARRAY(RadMapOctan, hitUV * CubeOctanResolution.xy, hitIndex);
+
+			color += saturate(dot(dir, normalWS)) /** saturate(dot(-dir, hitNormal))*/ * hitColor / (2 * PI * max(1.0f, tMax * tMax));
         }
 
-		if (result == TRACE_MISS)
-			color = PURPLE;
+		/*if (result == TRACE_MISS)
+			color = PURPLE;*/
         
         //uint destIndex = indices[1];
         //ProbeData pData = ProbeDataBuffer[destIndex];
@@ -272,5 +291,5 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 		//color = IndexToCoord(closestIndex);
     }
 	
-	return (color) /** brdfData.diffuse*/;
+	return (color) * brdfData.diffuse;
 }

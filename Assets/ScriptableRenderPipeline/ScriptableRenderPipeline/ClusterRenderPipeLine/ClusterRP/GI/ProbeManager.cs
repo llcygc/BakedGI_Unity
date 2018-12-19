@@ -233,7 +233,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                                     if (probeMat.shader.name != "Unlit/GI_ProbeDebug")
                                         probeMat = new Material(ProbeDebugShader);
 
-                                    probeMat.SetFloat("_ProbeID", index);
+                                    probeMat.SetFloat("_DebugProbeID", index);
                                     mesh.sharedMaterial = probeMat;
                                 }
 
