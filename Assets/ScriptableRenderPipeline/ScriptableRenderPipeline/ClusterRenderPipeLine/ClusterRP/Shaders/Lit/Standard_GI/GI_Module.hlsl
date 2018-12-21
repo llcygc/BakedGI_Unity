@@ -9,6 +9,36 @@ SAMPLER(sampler_DistMapOctan);
 TEXTURE2D_ARRAY(NormalMapOctan);
 SAMPLER(sampler_NormalMapOctan);
 
+TEXTURE2D_ARRAY(DistMapMinMipOctan);
+SAMPLER(sampler_DistMapMinMipOctan);
+
+bool LowResTrace(uint index, float3 localPos, float3 dir, inout float2 startUV, in float2 segEndUV, inout float2 hitEndUV)
+{
+	float2 startCoord = startUV * CubeOctanResolution.zw;
+	float2 endCoord = segEndUV * CubeOctanResolution.zw;
+
+	float texelSize = 1.0f / CubeOctanResolution.z;
+	float2 delta = endCoord - startCoord;
+
+	endCoord += float2((sqrLength(startCoord - endCoord) < 0.0001) ? 0.01 : 0.0);
+
+	float steps = max(abs(delta.x), abs(delta.y));
+	float dist = length(delta);
+	float traceStep = dist / steps;
+	float2 traceDir = delta / dist;
+
+	float traceDist = 0;
+	float distBefore = max(0.0, distanceToIntersectionFix(localPos, dir, initialDirectionFromProbe));
+
+	while (traceDist < dist)
+	{
+		float2 currentCoord = startCoord + traceDir * min(traceDist + steps, dist);
+
+		float sceneMinDist = 
+	}
+
+}
+
 //TRACE_HIT 0
 //TRACE_MISS 1
 //TRACE_UNKNONW 2

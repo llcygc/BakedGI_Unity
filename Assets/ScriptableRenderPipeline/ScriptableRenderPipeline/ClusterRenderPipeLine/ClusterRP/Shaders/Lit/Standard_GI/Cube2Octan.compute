@@ -4,11 +4,12 @@
 RW_TEXTURE2D_ARRAY(half3, RadMapOctan);
 RW_TEXTURE2D_ARRAY(half, DistMapOctan);
 RW_TEXTURE2D_ARRAY(half3, NormalMapOctan);
+RW_TEXTURE2D_ARRAY(half, DistMapMinMipOctan);
 
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel CubetoOctan
-[numthreads(8,8,1)]
 
+[numthreads(8,8,1)]
 void CubetoOctan(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
 {
 	uint probeIndex = globalIdx.z;
@@ -19,4 +20,24 @@ void CubetoOctan(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_Grou
 	RadMapOctan[globalIdx] = SAMPLE_TEXTURECUBE_ARRAY_LOD(GI_ProbeTexture, sampler_GI_ProbeTexture, cubeUV, probeIndex, 0);
 	DistMapOctan[globalIdx] = SAMPLE_TEXTURECUBE_ARRAY_LOD(GI_DepthTexture, sampler_GI_DepthTexture, cubeUV, probeIndex, 0);
 	NormalMapOctan[globalIdx] = SAMPLE_TEXTURECUBE_ARRAY_LOD(GI_NormalTexture, sampler_GI_NormalTexture, cubeUV, probeIndex, 0);
+}
+
+groupshared float minDist = 1000.0f;
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel OctanMinMip
+
+[numthreads(16, 16, 1)]
+void OctanMinMip(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+	float dist = DistMapOctan[globalIdx];
+
+	if (localIdx.x == 0 && localIdx.y == 0)
+		minDist = dist;
+	else if(minDist > dist )
+		minDist = dist;
+
+	GroupMemoryBarrierWithGroupSync();
+
+	if (localIdx.x == 0 && localIdx.y == 0)
+		DistMapMinMipOctan[groupIdx] = minDist;
 }

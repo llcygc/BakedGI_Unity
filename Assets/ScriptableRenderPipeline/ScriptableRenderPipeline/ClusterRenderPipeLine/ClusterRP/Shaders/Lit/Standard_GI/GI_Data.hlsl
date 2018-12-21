@@ -7,7 +7,6 @@
 #define TRACE_MISS 1
 #define TRACE_UNKNONW 2
 
-
 #define RED half3(1, 0, 0)
 #define GREEN half3(0, 1, 0)
 #define BLUE half3(0, 0, 1)
