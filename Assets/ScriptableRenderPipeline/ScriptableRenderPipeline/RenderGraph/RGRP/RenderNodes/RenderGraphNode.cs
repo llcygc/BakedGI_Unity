@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿#if RGRP_V_2
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -22,3 +23,4 @@ namespace Viva.Rendering.RenderGraph
         }
     }
 }
+#endif
