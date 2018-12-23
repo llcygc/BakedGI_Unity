@@ -22,7 +22,7 @@ void CubetoOctan(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_Grou
 	NormalMapOctan[globalIdx] = SAMPLE_TEXTURECUBE_ARRAY_LOD(GI_NormalTexture, sampler_GI_NormalTexture, cubeUV, probeIndex, 0);
 }
 
-groupshared float minDist = 1000.0f;
+groupshared float minDist = 0.0f;
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel OctanMinMip
 
@@ -31,9 +31,7 @@ void OctanMinMip(uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_Grou
 {
 	float dist = DistMapOctan[globalIdx];
 
-	if (localIdx.x == 0 && localIdx.y == 0)
-		minDist = dist;
-	else if(minDist > dist )
+	if(minDist < dist )
 		minDist = dist;
 
 	GroupMemoryBarrierWithGroupSync();

@@ -15,7 +15,8 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
         {
             Radiance = 0,
             Normal,
-            Distance
+            Distance,
+            DistanceMinMip
         };
         public bool ShowDebug;
         public ProbeDebugMode DebugMode;

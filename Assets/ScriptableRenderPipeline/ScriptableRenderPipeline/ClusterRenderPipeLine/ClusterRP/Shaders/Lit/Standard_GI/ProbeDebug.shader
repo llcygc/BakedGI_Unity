@@ -37,6 +37,9 @@
 			TEXTURE2D_ARRAY(NormalMapOctan);
 			SAMPLER(sampler_NormalMapOctan);
 
+			TEXTURE2D_ARRAY(DistMapMinMipOctan);
+			SAMPLER(sampler_DistMapMinMipOctan);
+
 			CBUFFER_START(ProbeDebugInfo)
 			float _DebugProbeID;
 			float GI_DebugMode;
@@ -63,6 +66,125 @@
 				o.uv = v.vertex.xyz;
 				o.uv.y *= -1;
 				return o;
+			}
+			
+			half3 LowResTrace(uint index, float3 localPos, float3 dir, inout float2 startUV, in float2 segEndUV, inout float2 hitEndUV, in float2 uv)
+			{
+				hitEndUV = startUV;
+				float2 startCoord = startUV * CubeOctanResolution.zw;
+				float2 segEndCoord = segEndUV * CubeOctanResolution.zw;
+
+				float texelSize = 1.0f / CubeOctanResolution.z;
+				float2 delta = segEndCoord - startCoord;
+
+				segEndCoord += ((sqrLength(startCoord - segEndCoord) < 0.0001) ? 0.01 : 0.0);
+
+				float steps = max(abs(delta.x), abs(delta.y));
+				float dist = length(delta);
+				float2 traceDir = delta / dist;
+
+				float traceDist = 0;
+				float3 dirBefore = octDecode(startUV * 2.0 - 1.0);
+				dirBefore.y *= -1;
+				float distBefore = max(0.0, distanceToIntersectionFix(localPos, dir, dirBefore));
+				float2 currentCoord = startCoord;
+
+				while (traceDist < dist)
+				{
+					float sceneMinDist = LOAD_TEXTURE2D_ARRAY(DistMapMinMipOctan, floor(currentCoord), index) * ProbeProjectonParam.y;
+
+					float2 deltaToPixelEdge = frac(currentCoord) - (sign(delta) * 0.5 + 0.5);
+					float2 distToPixelEdge = deltaToPixelEdge * (-1.0f / traceDir);
+					float traceStep = min(abs(distToPixelEdge.x), abs(distToPixelEdge.y));
+
+					float2 hitEndUV = (currentCoord + traceDir * traceStep) / CubeOctanResolution.zw;
+					if (length(hitEndUV * CubeOctanResolution.zw - startCoord) > dist)
+						hitEndUV = segEndUV;
+
+					float3 dirEnd = octDecode(hitEndUV * 2.0 - 1.0);
+					dirEnd.y *= -1;
+					float distAfter = max(0.0, distanceToIntersectionFix(localPos, dir, dirEnd));
+
+					float2 currentCenter = floor(currentCoord) + 0.5f;
+
+					if (length(uv * CubeOctanResolution.zw - currentCenter) <= 0.5f)
+					{
+						//return max(distBefore, distAfter) / ProbeProjectonParam.y;
+						if (max(distBefore, distAfter) > sceneMinDist)
+						{
+							startUV = currentCoord / CubeOctanResolution.zw;
+							return RED;
+						}
+						else
+							return GREEN;
+					}
+
+					const float epsilon = 0.001; // pixels
+					currentCoord += traceDir * (traceStep + epsilon);
+					traceDist += (traceStep + epsilon);
+				}
+
+				startUV = segEndUV;
+				return BLACK;
+			}
+
+			half3 TraceSingleProbeDebugLow(uint index, float3 worldPos, float3 dir, float tMin, float tMax, float2 uv)
+			{
+				ProbeData pData = ProbeDataBuffer[index];
+				float3 localPos = worldPos - pData.position;
+
+				float boundaryTs[5];
+
+				boundaryTs[0] = 0.0f;
+
+				float3 t = localPos * -(1.0f / dir);
+				sort(t);
+
+				for (int i = 0; i < 3; ++i)
+				{
+					boundaryTs[i + 1] = clamp(t[i], 0.0f, 1000.0f);
+				}
+
+				boundaryTs[4] = 1000.0f;
+
+				const float degenerateEpsilon = 0.001f;
+
+				const half3 colors[4] = { RED, GREEN, BLUE, ORANGE };
+
+				/*float3 startPointD = localPos;
+				startPointD.y *= -1;
+				float2 startUVD = octEncode(normalize(startPointD)) * 0.5 + 0.5;
+				float2 startCoordD = startUVD * CubeOctanResolution.x;
+				float sceneDistD = LOAD_TEXTURE2D_ARRAY(DistMapOctan, startCoordD, index) * ProbeProjectonParam.y;
+				if (length(uv - startUVD) <= (1 / CubeOctanResolution.x))
+				return length(localPos) / ProbeProjectonParam.y;*/
+
+				for (int i = 0; i < 4; i++)
+				{
+					float t0 = boundaryTs[i];
+					float t1 = boundaryTs[i + 1];
+					if (abs(t0 - t1) > degenerateEpsilon)
+					{
+						float3 startPoint = localPos + dir * (t0 + rayBumpEpsilon);
+						float3 endPoint = localPos + dir * (t1 - rayBumpEpsilon);
+
+						if (sqrLength(startPoint) < 0.001)
+							startPoint = dir;
+
+						startPoint.y *= -1;
+						endPoint.y *= -1;
+
+						float2 startUV = octEncode(normalize(startPoint)) * 0.5 + 0.5;
+						float2 endUV = octEncode(normalize(endPoint)) * 0.5 + 0.5;
+						float2 hitEndUV;
+
+						half3 debugColor = LowResTrace(index, localPos, dir, startUV, endUV, hitEndUV, uv);
+						if (!all(debugColor == 0))
+							return debugColor;
+					}
+				}
+
+				return 0;
 			}
 
 			half3 TraceSingleProbeDebug(uint index, float3 worldPos, float3 dir, float tMin, float tMax, float2 uv)
@@ -112,7 +234,7 @@
 						endPoint.y *= -1;
 
 						float2 startUV = octEncode(normalize(startPoint)) * 0.5 + 0.5;
-						float2 endUV = octEncode(normalize(endPoint)) * 0.5 + 0.5;						
+						float2 endUV = octEncode(normalize(endPoint)) * 0.5 + 0.5;	
 
 						float2 startCoord = startUV * CubeOctanResolution.x;
 						float2 endCoord = endUV * CubeOctanResolution.x;
@@ -191,24 +313,25 @@
 				float2 uv = octEncode(dir);
 				uv = uv * 0.5 + 0.5;
 				
-				half3 color = 0;
-				
+				half3 color = 0;				
 
 				if (GI_DebugMode == 0)
 					color += SAMPLE_TEXTURE2D_ARRAY(RadMapOctan, sampler_RadMapOctan, uv, _DebugProbeID);
 				else if (GI_DebugMode == 1)
 					color += SAMPLE_TEXTURE2D_ARRAY(NormalMapOctan, sampler_NormalMapOctan, uv, _DebugProbeID);
-				else
+				else if(GI_DebugMode == 2)
 					color += SAMPLE_TEXTURE2D_ARRAY(DistMapOctan, sampler_DistMapOctan, uv, _DebugProbeID).rrr;
+				else
+					color += LOAD_TEXTURE2D_ARRAY(DistMapMinMipOctan, (uv * CubeOctanResolution.zw), _DebugProbeID).rrr;
 
-				//color = half3(uv, 0);
+				color = half3(uv, 0);
 				//color = IndexToCoord(_DebugProbeID);
 
 				//Trace line debug
-				//half3 resultColor = TraceSingleProbeDebug((uint)_DebugProbeID, DebugPos, DebugDir, 0.0f, 1000.0f, uv);
+				half3 resultColor = TraceSingleProbeDebugLow((uint)_DebugProbeID, DebugPos, DebugDir, 0.0f, 1000.0f, uv);
 
-				/*if(!all(resultColor == 0))
-					color = resultColor;*/
+				if(!all(resultColor == 0))
+					color = resultColor;
 				
 
 				return color;
