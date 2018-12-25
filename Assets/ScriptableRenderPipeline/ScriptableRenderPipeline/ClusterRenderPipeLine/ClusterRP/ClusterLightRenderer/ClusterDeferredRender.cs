@@ -43,6 +43,7 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
         private ComputeNode VolumetricLightingNode;
         private ComputeNode VolumetricFogNode;
         private GeometryNode ForwardAfterFogNode;
+        private GeometryNode SkyNode;
 
         public override void SetUp()
         {
