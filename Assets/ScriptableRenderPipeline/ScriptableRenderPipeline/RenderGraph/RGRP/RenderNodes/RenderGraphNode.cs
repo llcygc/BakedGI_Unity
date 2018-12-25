@@ -12,6 +12,9 @@ namespace Viva.Rendering.RenderGraph
         protected RenderNodeContext context;
         protected CommandBuffer cmd;
 
+        public IRenderGraphNode nextNode;
+        public IRenderGraphNode prevNode;
+
         public RenderNodeContext NodeContext
         {
             get { return context; }

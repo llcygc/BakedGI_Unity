@@ -14,7 +14,7 @@ namespace Viva.Rendering.RenderGraph
 
         }
         // Update is called once per frame
-        public virtual void Update()
+        public virtual void Update(Camera cam)
         {
 
         }
@@ -22,6 +22,10 @@ namespace Viva.Rendering.RenderGraph
         public virtual void Execute(ScriptableRenderContext renderContext)
         {
 
+        }
+
+        public virtual void SetUpPostProcess()
+        {
         }
     }
 }
