@@ -10,6 +10,7 @@ namespace Viva.Rendering.RenderGraph
     {
         RenderQueueRange RenderQueue;
         RenderStateBlock StateBlock;
+        ShaderPassName[] ShaderPassNames;
         // Start is called before the first frame update
         void SetUp()
         {
