@@ -211,7 +211,6 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
             int frameHeight = m_FrameConfig.rtConfig.frameHeight;
             MSAASamples frameMsaaSamples = m_FrameConfig.rtConfig.msaaSamples;
 
-            m_CameraColorBuffer = RTHandles.Alloc(width: frameWidth, height: frameHeight, filterMode: FilterMode.Point, colorFormat: RenderTextureFormat.ARGBHalf, sRGB: false, msaaSamples: frameMsaaSamples, enableRandomWrite: true, name: "CameraColor");
             m_CameraDepthStencilBuffer = RTHandles.Alloc(width: frameWidth, height: frameHeight, depthBufferBits: DepthBits.Depth24, colorFormat: RenderTextureFormat.Depth, filterMode: FilterMode.Point, bindTextureMS: false, msaaSamples: frameMsaaSamples, name: "CameraDepthStencil");
             m_VelocityBuffer = RTHandles.Alloc(width: frameWidth, height: frameHeight, filterMode: FilterMode.Point, colorFormat: RenderTextureFormat.RGHalf, sRGB: false, name: "Velocity");
             m_R8Buffer = RTHandles.Alloc(width: frameWidth, height: frameHeight, filterMode: FilterMode.Bilinear, colorFormat: RenderTextureFormat.R8, sRGB: false, msaaSamples: frameMsaaSamples, enableRandomWrite: true,name: "R8Buffer");
@@ -226,7 +225,6 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
             if (NeedDepthBufferCopy())
             {
                 m_CameraDepthBufferCopy = RTHandles.Alloc(width: frameWidth, height: frameHeight, depthBufferBits: DepthBits.Depth24, colorFormat: RenderTextureFormat.Depth, filterMode: FilterMode.Point, bindTextureMS: false, msaaSamples: frameMsaaSamples, name: "CameraDepthCopy");
-                m_CameraColorBufferCopy = RTHandles.Alloc(width: frameWidth, height: frameHeight, filterMode: FilterMode.Bilinear, colorFormat: RenderTextureFormat.ARGBHalf, sRGB: false, msaaSamples: frameMsaaSamples, enableRandomWrite: false, name: "CameraColorCopy");
             }
 
             m_LightManager.Build(asset.renderPipelineResources, m_FrameConfig.clusterConfig, asset.shadowInitParams, m_ShadowSettings);
@@ -949,7 +947,6 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
             if (rtC.textureDimension == TextureDimension.Tex2DArray)
                 texArraySlices = 2;
 
-            m_CameraColorBuffer = RTHandles.Alloc(width: rtC.frameWidth, height: rtC.frameHeight, filterMode: FilterMode.Point, colorFormat: RenderTextureFormat.ARGBHalf, sRGB: false, enableRandomWrite: true, dimension: rtC.textureDimension, slices: texArraySlices, msaaSamples: rtC.msaaSamples, name: "CameraColor");
             m_CameraDepthStencilBuffer = RTHandles.Alloc(width: rtC.frameWidth, height: rtC.frameHeight, filterMode: FilterMode.Point, depthBufferBits: DepthBits.Depth24, colorFormat: RenderTextureFormat.Depth, enableRandomWrite: false, dimension: rtC.textureDimension, slices: texArraySlices, msaaSamples: rtC.msaaSamples, name: "CameraDepthStencil");
 
             //UnityEngine.Debug.Log("RT Dimension: " + texArraySlices.ToString());
@@ -991,7 +988,6 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
                     RTHandles.Release(m_CameraColorBufferCopy);
 
                 m_CameraDepthBufferCopy = RTHandles.Alloc(width: rtC.frameWidth, height: rtC.frameHeight, filterMode: FilterMode.Point, depthBufferBits: DepthBits.Depth24, colorFormat: RenderTextureFormat.Depth, enableRandomWrite: false, dimension: rtC.textureDimension, slices: texArraySlices, msaaSamples: rtC.msaaSamples, name: "CameraDepthCopy");
-                m_CameraColorBufferCopy = RTHandles.Alloc(width: rtC.frameWidth, height: rtC.frameHeight, filterMode: FilterMode.Point, depthBufferBits: DepthBits.Depth24, colorFormat: RenderTextureFormat.ARGBHalf, enableRandomWrite: false, dimension: rtC.textureDimension, slices: texArraySlices, msaaSamples: rtC.msaaSamples, name: "CameraColorCopy");
             }
         }
 

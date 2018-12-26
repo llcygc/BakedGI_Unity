@@ -14,7 +14,6 @@ namespace Viva.Rendering.RenderGraph
 
         }
         // Update is called once per frame
-        public virtual void Update()
         {
 
         }
