@@ -324,7 +324,7 @@
 				else
 					color += LOAD_TEXTURE2D_ARRAY(DistMapMinMipOctan, (uv * CubeOctanResolution.zw), _DebugProbeID).rrr;
 
-				color = half3(uv, 0);
+				//color = half3(uv, 0);
 				//color = IndexToCoord(_DebugProbeID);
 
 				//Trace line debug

@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿#if RGRP_V_RD
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -110,3 +111,4 @@ namespace Viva.Rendering.RenderGraph.ClusterPipeline
 #endif
     }
 }
+#endif

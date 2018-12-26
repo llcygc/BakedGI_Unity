@@ -9,7 +9,7 @@ namespace Viva.Rendering.RenderGraph
 {
     public abstract class IRGRenderer
     {
-        public virtual void SetUp()
+        public virtual void SetUp(ScriptableObject m_Asset)
         {
 
         }

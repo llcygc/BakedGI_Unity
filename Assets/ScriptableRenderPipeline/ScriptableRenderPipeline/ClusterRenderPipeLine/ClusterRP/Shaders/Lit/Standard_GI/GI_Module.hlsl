@@ -43,7 +43,7 @@ bool LowResTrace(uint index, float3 localPos, float3 dir, inout float2 startUV, 
         float traceStep = min(abs(distToPixelEdge.x), abs(distToPixelEdge.y));
         
         float2 hitEndCoord = (currentCoord + traceDir * traceStep);
-        float2 hitEndUV = hitEndCoord / CubeOctanResolution.zw;
+        hitEndUV = hitEndCoord / CubeOctanResolution.zw;
         if (length(hitEndUV * CubeOctanResolution.zw - startCoord) > dist)
             hitEndUV = segEndUV;
 
@@ -53,7 +53,7 @@ bool LowResTrace(uint index, float3 localPos, float3 dir, inout float2 startUV, 
         
         float2 detlaCoord = abs(hitEndCoord - currentCoord);
         debugColor = half3(hitEndUV, 0.0f); //sceneMinDist / ProbeProjectonParam.y;
-        if (min(distBefore, distAfter) > sceneMinDist)
+        if (max(distBefore, distAfter) > sceneMinDist)
         {
             startUV = currentCoord / CubeOctanResolution.zw;
             debugColor = half3(startUV, 0); //sceneMinDist / ProbeProjectonParam.y;
@@ -85,12 +85,13 @@ uint HighResTrace(uint index, float3 localPos, float3 dir, inout float tMin, ino
     float3 dirBefore = octDecode((startUV) * 2.0 - 1.0);
     dirBefore.y *= -1;
     float distBefore = max(0.0, distanceToIntersectionFix(localPos, dir, dirBefore));
-    
-    debugColor = PURPLE;
+
     float traceDist = 0;
+
     while (traceDist < dist)
     {
-        float2 currentUV = saturate(startUV + traceDir * min(traceDist + traceStep * 0.5, dist));
+		debugColor = PURPLE;
+        float2 currentUV = (startCoord + traceDir * min(traceDist + traceStep * 0.5, dist)) / CubeOctanResolution.x;
         if (all(currentUV >= 0) && all(currentUV <= 1))
         {
             int2 currentCoord = (int2) (currentUV * CubeOctanResolution.xy);
@@ -243,7 +244,7 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 
 	int count = 0;
 	float step = 0.5f;
-    [loop]for (int i = 0; i < 1/*SAMPLE_COUNT*/; i++)
+    [loop]for (int i = 0; i < SAMPLE_COUNT; i++)
 	{
 		float divX = floor(i / SAMPLE_DIM) + 1;
 		float divY = i % SAMPLE_DIM + 1;
@@ -254,7 +255,7 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 		float y = sin(phi) * sin(theta);
 		float z = cos(phi);
 
-		float3 dir = normalWS /** z + binormal * y + tangent * x*/;
+		float3 dir = normalWS * z + binormal * y + tangent * x;
         half3 skyColor;
 
 		worldPos += dir * rayBumpEpsilon;
@@ -289,12 +290,12 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
         {
 			half3 hitColor= LOAD_TEXTURE2D_ARRAY(RadMapOctan, hitUV * CubeOctanResolution.xy, hitIndex);
 
-			//color += saturate(dot(dir, normalWS)) /** saturate(dot(-dir, hitNormal))*/ * hitColor / (2 * PI * max(1.0f, tMax * tMax));
+			color += saturate(dot(dir, normalWS)) /** saturate(dot(-dir, hitNormal))*/ * hitColor / (2 * PI * max(1.0f, tMax * tMax));
         }
 
-        if (result == TRACE_MISS)
+        /*if (result == TRACE_MISS)
             color = PURPLE;
-        color = debugColor;
+        color = debugColor;*/
         
         //uint destIndex = indices[1];
         //ProbeData pData = ProbeDataBuffer[destIndex];
@@ -367,5 +368,5 @@ half3 GlobalIllumination_Trace(BRDFData_Direct brdfData, half3 normalWS, half3 t
 		//color = IndexToCoord(closestIndex);
     }
 	
-	return (color)/* * brdfData.diffuse*/;
+	return (color) * brdfData.diffuse;
 }
